@@ -43,7 +43,7 @@ const FONTSET_START_ADDR: usize = 0x50;
 struct Chip8 {
     pc: usize,
     registers: Registers,
-    stack: Vec<u16>, // max depth = 16
+    stack: Vec<u16>, // max depth: 16
     memory: Memory,
     timer_delay: u8,
     timer_sound: u8,
@@ -72,18 +72,29 @@ impl Chip8 {
         self.memory.load_bytes(&rom, &START_ADDR);
     }
 
-    fn run(&mut self) {
-        // opcodes are 16-bits
+    fn fetch(&mut self) -> u16 {
         // fetch first byte, shift it left
         let opcode: u16 = (self.memory.bytes[self.pc] as u16) << 8;
-        // fetch second byte, OR with shifted bytes
+        // fetch second byte, OR with shifted bytes to place it on the right side
         let opcode: u16 = opcode | (self.memory.bytes[self.pc + 1] as u16);
 
-        // increment pc by 16 bits
         self.pc += 2;
+        opcode
+    }
 
-        // decode
-        // execute
+    fn decode(&self, opcode: u16) -> Operation {
+        todo!();
+    }
+
+    fn execute(&mut self, op: Operation) {
+        todo!();
+    }
+
+    fn cycle(&mut self) {
+        let opcode = self.fetch();
+        let operation = self.decode(opcode);
+        self.execute(operation);
+
         // decrement timers
     }
 }
@@ -156,4 +167,8 @@ impl Memory {
     fn get_byte(&self, offset: &usize) -> u8 {
         self.bytes[*offset]
     }
+}
+
+enum Operation {
+    ClearScreen,
 }
