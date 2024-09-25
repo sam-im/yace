@@ -1,4 +1,4 @@
-use log::info;
+use log::{error, info};
 use std::path::Path;
 
 fn main() {
@@ -83,11 +83,21 @@ impl Chip8 {
     }
 
     fn decode(&self, opcode: u16) -> Operation {
-        todo!();
+        let bitmask: u16 = 0b1111_0000_0000_0000;
+        let mut vec = [0 as u8; 4];
+
+        for i in 0..=3 {
+            let masked = (bitmask >> i) & opcode;
+            let nibble = masked >> (3 - i) * 4;
+            vec[i] = nibble as u8;
+        }
+        todo!()
     }
 
     fn execute(&mut self, op: Operation) {
-        todo!();
+        match op {
+            _ => todo!(),
+        }
     }
 
     fn cycle(&mut self) {
@@ -95,7 +105,7 @@ impl Chip8 {
         let operation = self.decode(opcode);
         self.execute(operation);
 
-        // decrement timers
+        // check to decrement timers
     }
 }
 
