@@ -87,15 +87,60 @@ impl Chip8 {
         let mut vec = [0 as u8; 4];
 
         for i in 0..=3 {
-            let masked = (bitmask >> i) & opcode;
+            let masked = (bitmask >> i * 4) & opcode;
             let nibble = masked >> (3 - i) * 4;
             vec[i] = nibble as u8;
         }
-        todo!()
+
+        if let [0x0, 0x0, 0xE, 0x0] = vec {
+            return Operation::ClearScreen;
+        }
+
+        match vec[0] {
+            0x1 => Operation::Jump((0x0FFF & opcode).into()),
+            0x6 => Operation::Set(vec[1].into(), (0x00FF & opcode) as u8),
+            0x7 => Operation::Add(vec[1].into(), (0x00FF & opcode) as u8),
+            0xA => Operation::SetI((0x0FFF & opcode).into()),
+            0xD => Operation::Draw(vec[1].into(), vec[2].into(), vec[3]),
+            _ => todo!(),
+        }
     }
 
     fn execute(&mut self, op: Operation) {
         match op {
+            Operation::Add(vx, val) => self.registers.v[vx as usize] = val,
+            Operation::ClearScreen => self.display.fill(false),
+            Operation::Draw(vx, vy, val) => {
+                let x_coord = (self.registers.v[vx] % 64) as usize;
+                let y_coord = (self.registers.v[vy] % 32) as usize;
+                self.registers.v[15] = 0;
+                let sprite_addr = self.registers.i;
+
+                for i in 0..=val {
+                    let sprite_byte = self.memory.get_byte(&sprite_addr + i as usize);
+                    let bitmask: u8 = 0b1000_0000;
+                    for j in 0..8 {
+                        // clip overflowing pixels
+                        if x_coord + j < 64 {
+                            continue;
+                        }
+                        let display_index = 32 * y_coord + x_coord + j;
+
+                        let current_pixel = self.display[display_index];
+                        let sprite_pixel: bool = ((bitmask >> j) & sprite_byte).count_ones() > 0;
+
+                        if current_pixel & sprite_pixel {
+                            self.display[display_index] = false;
+                            self.registers.v[15] = 1;
+                        } else {
+                            self.display[display_index] = sprite_pixel;
+                        }
+                    }
+                }
+            },
+            Operation::Jump(addr) => self.pc = addr,
+            Operation::Set(vx, val) => self.registers.v[vx] = val,
+            Operation::SetI(addr) => self.registers.i = addr,
             _ => todo!(),
         }
     }
@@ -113,44 +158,14 @@ impl Chip8 {
 // and an 16-bit instruction register called I
 // for storing addresses (12-bit for 0x000-0xFFF)
 struct Registers {
-    v0: u8,
-    v1: u8,
-    v2: u8,
-    v3: u8,
-    v4: u8,
-    v5: u8,
-    v6: u8,
-    v7: u8,
-    v8: u8,
-    v9: u8,
-    va: u8,
-    vb: u8,
-    vc: u8,
-    vd: u8,
-    ve: u8,
-    vf: u8,   // flag register
+    v: [u8; 16],
     i: usize, // 16-bit index register
 }
 
 impl Registers {
     fn new() -> Self {
         Self {
-            v0: 0,
-            v1: 0,
-            v2: 0,
-            v3: 0,
-            v4: 0,
-            v5: 0,
-            v6: 0,
-            v7: 0,
-            v8: 0,
-            v9: 0,
-            va: 0,
-            vb: 0,
-            vc: 0,
-            vd: 0,
-            ve: 0,
-            vf: 0,
+            v: [0; 16],
             i: 0,
         }
     }
@@ -174,11 +189,16 @@ impl Memory {
         }
     }
 
-    fn get_byte(&self, offset: &usize) -> u8 {
-        self.bytes[*offset]
+    fn get_byte(&self, offset: usize) -> u8 {
+        self.bytes[offset]
     }
 }
 
 enum Operation {
     ClearScreen,
+    Jump(usize),
+    Set(usize, u8),
+    Add(usize, u8),
+    SetI(usize),
+    Draw(usize, usize, u8),
 }
