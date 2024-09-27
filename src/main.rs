@@ -84,49 +84,51 @@ impl Chip8 {
 
     fn decode(&self, opcode: u16) -> Operation {
         let bitmask: u16 = 0b1111_0000_0000_0000;
-        let mut vec = [0 as u8; 4];
+        let mut vec = [0 as usize; 4];
 
         for i in 0..=3 {
             let masked = (bitmask >> i * 4) & opcode;
             let nibble = masked >> (3 - i) * 4;
-            vec[i] = nibble as u8;
-        }
-
-        if let [0x0, 0x0, 0xE, 0x0] = vec {
-            return Operation::ClearScreen;
+            vec[i] = nibble as usize;
         }
 
         match vec[0] {
+            0x0 => match [vec[1], vec[2], vec[3]] {
+                [0x0, 0xE, 0x0] => Operation::ClearScreen,
+                [0x0, 0xE, 0xE] => Operation::RetSubroutine,
+                _ => panic!("opcode: {}", opcode),
+            }
             0x1 => Operation::Jump((0x0FFF & opcode).into()),
-            0x6 => Operation::Set(vec[1].into(), (0x00FF & opcode) as u8),
-            0x7 => Operation::Add(vec[1].into(), (0x00FF & opcode) as u8),
+            0x2 => Operation::CallSubroutine((0x0FFF & opcode).into()),
+            0x6 => Operation::Set(vec[1], (0x00FF & opcode) as u8),
+            0x7 => Operation::Add(vec[1], (0x00FF & opcode) as u8),
             0xA => Operation::SetI((0x0FFF & opcode).into()),
-            0xD => Operation::Draw(vec[1].into(), vec[2].into(), vec[3]),
-            _ => todo!(),
+            0xD => Operation::Draw(vec[1], vec[2], vec[3]),
+            _ => panic!("Couldn't decode opcode: {}", opcode),
         }
     }
 
+    /// All operation implementations
     fn execute(&mut self, op: Operation) {
         match op {
-            Operation::Add(vx, val) => self.registers.v[vx as usize] = val,
             Operation::ClearScreen => self.display.fill(false),
-            Operation::Draw(vx, vy, val) => {
+            Operation::Add(vx, val) => self.registers.v[vx as usize] += val,
+            Operation::Draw(vx, vy, row) => {
                 let x_coord = (self.registers.v[vx] % 64) as usize;
                 let y_coord = (self.registers.v[vy] % 32) as usize;
                 self.registers.v[15] = 0;
                 let sprite_addr = self.registers.i;
+                let bitmask: u8 = 0b1000_0000;
 
-                for i in 0..=val {
-                    let sprite_byte = self.memory.get_byte(&sprite_addr + i as usize);
-                    let bitmask: u8 = 0b1000_0000;
+                for i in 0..=row {
+                    let sprite_byte = self.memory.get_byte(&sprite_addr + i);
                     for j in 0..8 {
-                        // clip overflowing pixels
-                        if x_coord + j < 64 {
-                            continue;
+                        if x_coord + j > 64 {
+                            break;
                         }
-                        let display_index = 32 * y_coord + x_coord + j;
-
+                        let display_index = 64 * (y_coord + i) + x_coord + j;
                         let current_pixel = self.display[display_index];
+                        // gets the value of a single bit from the row
                         let sprite_pixel: bool = ((bitmask >> j) & sprite_byte).count_ones() > 0;
 
                         if current_pixel & sprite_pixel {
@@ -136,12 +138,19 @@ impl Chip8 {
                             self.display[display_index] = sprite_pixel;
                         }
                     }
+                    if y_coord + i > 32 {
+                        break;
+                    }
                 }
             },
             Operation::Jump(addr) => self.pc = addr,
             Operation::Set(vx, val) => self.registers.v[vx] = val,
             Operation::SetI(addr) => self.registers.i = addr,
-            _ => todo!(),
+            Operation::CallSubroutine(addr) => {
+                self.stack.push(self.pc);
+                self.pc = addr;
+            },
+            Operation::RetSubroutine => self.pc = self.stack.pop().unwrap(),
         }
     }
 
@@ -195,10 +204,20 @@ impl Memory {
 }
 
 enum Operation {
+    /// 00E0
     ClearScreen,
+    /// 1NNN
     Jump(usize),
+    /// 6XNN
     Set(usize, u8),
+    /// 7XNN
     Add(usize, u8),
+    /// ANNN
     SetI(usize),
-    Draw(usize, usize, u8),
+    /// DXYN
+    Draw(usize, usize, usize),
+    /// 2NNN: Call a subroutine
+    CallSubroutine(usize),
+    /// 00EE: Return from subroutine
+    RetSubroutine,
 }
