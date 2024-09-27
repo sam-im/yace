@@ -1,5 +1,5 @@
 use log::{error, info};
-use std::path::Path;
+use std::{path::Path, thread::{self, sleep}, time::Duration};
 
 fn main() {
     std::env::set_var("RUST_LOG", "DEBUG");
@@ -9,10 +9,15 @@ fn main() {
     let mut chip8 = Chip8::new();
 
     info!("Loading ROM to memory");
-    chip8.load_rom(&Path::new("roms/ex.rom"));
+    chip8.load_rom(&Path::new("./roms/1-chip8-logo.ch8"));
 
     info!("Starting Chip8 emulation");
-    // chip8.run();
+    loop {
+        // attempt to simulate 1Mhz
+        thread::sleep(Duration::from_millis(1));
+        chip8.cycle();
+        chip8.print_display();
+    }
 }
 
 // First 512-bytes are reserved for the interpreter
@@ -40,19 +45,18 @@ const FONTSET: [u8; 80] = [
 // But for some reason 0x050 is popular
 const FONTSET_START_ADDR: usize = 0x50;
 
-struct Chip8 {
+pub struct Chip8 {
     pc: usize,
     registers: Registers,
-    stack: Vec<u16>, // max depth: 16
+    stack: Vec<usize>, // max depth: 16
     memory: Memory,
     timer_delay: u8,
     timer_sound: u8,
-    display: [bool; 64 * 32],
+    pub display: [bool; 64 * 32],
 }
 
 impl Chip8 {
     fn new() -> Self {
-        // initialize ram and load fontset
         let mut memory = Memory::new();
         memory.load_bytes(&FONTSET, &FONTSET_START_ADDR);
 
@@ -70,6 +74,19 @@ impl Chip8 {
     fn load_rom(&mut self, path: &Path) {
         let rom = std::fs::read(path).unwrap();
         self.memory.load_bytes(&rom, &START_ADDR);
+    }
+
+    fn print_display(&self) {
+        // clear terminal
+        print!("{}[2J", 27 as char);
+
+        for i in 0..32 {
+            for j in 0..64 {
+                let pixel = if self.display[64 * i + j] { 'o' } else { '.' };
+                print!("{}", pixel);
+            }
+            println!()
+        }
     }
 
     fn fetch(&mut self) -> u16 {
