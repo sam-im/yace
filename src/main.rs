@@ -105,6 +105,7 @@ impl Chip8 {
 
         for i in 0..=3 {
             let masked = (bitmask >> i * 4) & opcode;
+            // get the next four bits
             let nibble = masked >> (3 - i) * 4;
             vec[i] = nibble as usize;
         }
@@ -113,15 +114,19 @@ impl Chip8 {
             0x0 => match [vec[1], vec[2], vec[3]] {
                 [0x0, 0xE, 0x0] => Operation::ClearScreen,
                 [0x0, 0xE, 0xE] => Operation::RetSubroutine,
-                _ => panic!("opcode: {}", opcode),
+                _ => panic!("Error decoding opcode: {}", opcode),
             }
             0x1 => Operation::Jump((0x0FFF & opcode).into()),
             0x2 => Operation::CallSubroutine((0x0FFF & opcode).into()),
+            0x3 => Operation::SkipIfEqImm(vec[1], (0x00FF & opcode) as u8),
+            0x4 => Operation::SkipIfNotEqImm(vec[1], (0x00FF & opcode) as u8),
+            0x5 => Operation::SkipIfEq(vec[1], vec[2]),
             0x6 => Operation::Set(vec[1], (0x00FF & opcode) as u8),
             0x7 => Operation::Add(vec[1], (0x00FF & opcode) as u8),
+            0x9 => Operation::SkipIfNotEq(vec[1], vec[2]),
             0xA => Operation::SetI((0x0FFF & opcode).into()),
             0xD => Operation::Draw(vec[1], vec[2], vec[3]),
-            _ => panic!("Couldn't decode opcode: {}", opcode),
+            _ => panic!("Error decoding opcode: {}", opcode),
         }
     }
 
@@ -162,6 +167,10 @@ impl Chip8 {
             },
             Operation::Jump(addr) => self.pc = addr,
             Operation::Set(vx, val) => self.registers.v[vx] = val,
+            Operation::SkipIfEqImm(vx, val) => if self.registers.v[vx] == val { self.pc += 2; },
+            Operation::SkipIfNotEqImm(vx, val) => if self.registers.v[vx] != val { self.pc += 2; },
+            Operation::SkipIfEq(vx, vy) => if self.registers.v[vx] == self.registers.v[vy] { self.pc += 2 },
+            Operation::SkipIfNotEq(vx, vy) => if self.registers.v[vx] != self.registers.v[vy] { self.pc += 2; },
             Operation::SetI(addr) => self.registers.i = addr,
             Operation::CallSubroutine(addr) => {
                 self.stack.push(self.pc);
@@ -223,8 +232,20 @@ impl Memory {
 enum Operation {
     /// 00E0
     ClearScreen,
+    /// 00EE: Return from subroutine
+    RetSubroutine,
     /// 1NNN
     Jump(usize),
+    /// 2NNN: Call a subroutine
+    CallSubroutine(usize),
+    /// 3XNN: Skip if VX == NN
+    SkipIfEqImm(usize, u8),
+    /// 4XNN
+    SkipIfNotEqImm(usize, u8),
+    /// 5XY0
+    SkipIfEq(usize, usize),
+    /// 9XY0
+    SkipIfNotEq(usize, usize),
     /// 6XNN
     Set(usize, u8),
     /// 7XNN
@@ -233,8 +254,4 @@ enum Operation {
     SetI(usize),
     /// DXYN
     Draw(usize, usize, usize),
-    /// 2NNN: Call a subroutine
-    CallSubroutine(usize),
-    /// 00EE: Return from subroutine
-    RetSubroutine,
 }
