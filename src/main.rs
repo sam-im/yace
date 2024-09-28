@@ -82,7 +82,7 @@ impl Chip8 {
 
         for i in 0..32 {
             for j in 0..64 {
-                let pixel = if self.display[64 * i + j] { 'o' } else { '.' };
+                let pixel = if self.display[64 * i + j] { '■' } else { ' ' };
                 print!("{}", pixel);
             }
             println!()
@@ -99,7 +99,7 @@ impl Chip8 {
         opcode
     }
 
-    fn decode(&self, opcode: u16) -> Operation {
+    fn decode(&self, opcode: u16) -> Op {
         let bitmask: u16 = 0b1111_0000_0000_0000;
         let mut vec = [0 as usize; 4];
 
@@ -112,37 +112,47 @@ impl Chip8 {
 
         match vec[0] {
             0x0 => match [vec[1], vec[2], vec[3]] {
-                [0x0, 0xE, 0x0] => Operation::ClearScreen,
-                [0x0, 0xE, 0xE] => Operation::RetSubroutine,
+                [0x0, 0xE, 0x0] => Op::ClearScreen,
+                [0x0, 0xE, 0xE] => Op::RetSubroutine,
                 _ => panic!("Error decoding opcode: {}", opcode),
             }
-            0x1 => Operation::Jump((0x0FFF & opcode).into()),
-            0x2 => Operation::CallSubroutine((0x0FFF & opcode).into()),
-            0x3 => Operation::SkipIfEqImm(vec[1], (0x00FF & opcode) as u8),
-            0x4 => Operation::SkipIfNotEqImm(vec[1], (0x00FF & opcode) as u8),
-            0x5 => Operation::SkipIfEq(vec[1], vec[2]),
-            0x6 => Operation::Set(vec[1], (0x00FF & opcode) as u8),
-            0x7 => Operation::Add(vec[1], (0x00FF & opcode) as u8),
-            0x9 => Operation::SkipIfNotEq(vec[1], vec[2]),
-            0xA => Operation::SetI((0x0FFF & opcode).into()),
-            0xD => Operation::Draw(vec[1], vec[2], vec[3]),
+            0x1 => Op::Jump((0x0FFF & opcode).into()),
+            0x2 => Op::CallSubroutine((0x0FFF & opcode).into()),
+            0x3 => Op::SkipIfEqImm(vec[1], (0x00FF & opcode) as u8),
+            0x4 => Op::SkipIfNotEqImm(vec[1], (0x00FF & opcode) as u8),
+            0x5 => Op::SkipIfEq(vec[1], vec[2]),
+            0x6 => Op::SetImm(vec[1], (0x00FF & opcode) as u8),
+            0x7 => Op::AddImm(vec[1], (0x00FF & opcode) as u8),
+            0x8 => match vec[3] {
+                0x0 => Op::Set(vec[1], vec[2]),
+                0x1 => Op::Or(vec[1], vec[2]),
+                0x2 => Op::And(vec[1], vec[2]),
+                0x3 => Op::Xor(vec[1], vec[2]),
+                0x4 => Op::Add(vec[1], vec[2]),
+                0x5 => Op::Subtract(vec[1], vec[2]),
+                0x7 => Op::SubtractRev(vec[1], vec[2]),
+                _ => panic!("Error decoding opcode: {}", opcode),
+            }
+            0x9 => Op::SkipIfNotEq(vec[1], vec[2]),
+            0xA => Op::SetI((0x0FFF & opcode).into()),
+            0xD => Op::Draw(vec[1], vec[2], vec[3]),
             _ => panic!("Error decoding opcode: {}", opcode),
         }
     }
 
     /// All operation implementations
-    fn execute(&mut self, op: Operation) {
+    fn execute(&mut self, op: Op) {
         match op {
-            Operation::ClearScreen => self.display.fill(false),
-            Operation::Add(vx, val) => self.registers.v[vx as usize] += val,
-            Operation::Draw(vx, vy, row) => {
+            Op::ClearScreen => self.display.fill(false),
+            Op::AddImm(vx, val) => self.registers.v[vx as usize] += val,
+            Op::Draw(vx, vy, row) => {
                 let x_coord = (self.registers.v[vx] % 64) as usize;
                 let y_coord = (self.registers.v[vy] % 32) as usize;
                 self.registers.v[15] = 0;
                 let sprite_addr = self.registers.i;
                 let bitmask: u8 = 0b1000_0000;
 
-                for i in 0..=row {
+                for i in 0..row {
                     let sprite_byte = self.memory.get_byte(&sprite_addr + i);
                     for j in 0..8 {
                         if x_coord + j > 64 {
@@ -165,18 +175,59 @@ impl Chip8 {
                     }
                 }
             },
-            Operation::Jump(addr) => self.pc = addr,
-            Operation::Set(vx, val) => self.registers.v[vx] = val,
-            Operation::SkipIfEqImm(vx, val) => if self.registers.v[vx] == val { self.pc += 2; },
-            Operation::SkipIfNotEqImm(vx, val) => if self.registers.v[vx] != val { self.pc += 2; },
-            Operation::SkipIfEq(vx, vy) => if self.registers.v[vx] == self.registers.v[vy] { self.pc += 2 },
-            Operation::SkipIfNotEq(vx, vy) => if self.registers.v[vx] != self.registers.v[vy] { self.pc += 2; },
-            Operation::SetI(addr) => self.registers.i = addr,
-            Operation::CallSubroutine(addr) => {
+            Op::Jump(addr) => self.pc = addr,
+            Op::SetImm(vx, val) => self.registers.v[vx] = val,
+            Op::SkipIfEqImm(vx, val) => if self.registers.v[vx] == val { self.pc += 2; },
+            Op::SkipIfNotEqImm(vx, val) => if self.registers.v[vx] != val { self.pc += 2; },
+            Op::SkipIfEq(vx, vy) => if self.registers.v[vx] == self.registers.v[vy] { self.pc += 2 },
+            Op::Set(vx, vy) => self.registers.v[vx] = self.registers.v[vy],
+            Op::Or(vx, vy) => {
+                let save = self.registers.v[vx] | self.registers.v[vy];
+                self.registers.v[vx] = save;
+            },
+            Op::And(vx, vy) => {
+                let save = self.registers.v[vx] & self.registers.v[vy];
+                self.registers.v[vx] = save;
+            },
+            Op::Xor(vx, vy) => {
+                let save = self.registers.v[vx] ^ self.registers.v[vy];
+                self.registers.v[vx] = save;
+            }
+            Op::Add(vx, vy) => {
+                let x = self.registers.v[vx];
+                let y = self.registers.v[vy];
+                let overflow = (x + y) as u16 > 255;
+                let save = x.wrapping_add(y);
+                self.registers.v[15] = if overflow { 1 } else { 0 };
+                self.registers.v[vx] = save;
+            },
+            Op::Subtract(vx, vy) => {
+                let x = self.registers.v[vx];
+                let y = self.registers.v[vy];
+
+                let underflow = x < y;
+                let save = x.wrapping_sub(y);
+
+                self.registers.v[15] = if underflow { 0 } else { 1 };
+                self.registers.v[vx] = save;
+            },
+            Op::SubtractRev(vx, vy) => {
+                let x = self.registers.v[vx];
+                let y = self.registers.v[vy];
+
+                let underflow = y < x;
+                let save = y.wrapping_sub(x);
+
+                self.registers.v[15] = if underflow { 0 } else { 1 };
+                self.registers.v[vx] = save;
+            }
+            Op::SkipIfNotEq(vx, vy) => if self.registers.v[vx] != self.registers.v[vy] { self.pc += 2; },
+            Op::SetI(addr) => self.registers.i = addr,
+            Op::CallSubroutine(addr) => {
                 self.stack.push(self.pc);
                 self.pc = addr;
             },
-            Operation::RetSubroutine => self.pc = self.stack.pop().unwrap(),
+            Op::RetSubroutine => self.pc = self.stack.pop().unwrap(),
         }
     }
 
@@ -229,7 +280,7 @@ impl Memory {
     }
 }
 
-enum Operation {
+enum Op {
     /// 00E0
     ClearScreen,
     /// 00EE: Return from subroutine
@@ -244,12 +295,26 @@ enum Operation {
     SkipIfNotEqImm(usize, u8),
     /// 5XY0
     SkipIfEq(usize, usize),
+    /// 6XNN
+    SetImm(usize, u8),
+    /// 7XNN
+    AddImm(usize, u8),
+    /// 8XY0 Set vx to vy
+    Set(usize, usize),
+    /// 8XY1 Binary OR
+    Or(usize, usize),
+    /// 8XY2 Binary AND
+    And(usize, usize),
+    /// 8XY3 Logical XOR
+    Xor(usize, usize),
+    /// 8XY4 Add
+    Add(usize, usize),
+    /// 8XY5 Subtract vx - vy
+    Subtract(usize, usize),
+    /// 8XY7 Subtract vy - vx
+    SubtractRev(usize, usize),
     /// 9XY0
     SkipIfNotEq(usize, usize),
-    /// 6XNN
-    Set(usize, u8),
-    /// 7XNN
-    Add(usize, u8),
     /// ANNN
     SetI(usize),
     /// DXYN
