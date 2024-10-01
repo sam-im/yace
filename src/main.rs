@@ -1,20 +1,12 @@
-use log::{error, info};
-use std::{path::Path, thread::{self, sleep}, time::Duration};
+use std::{path::Path, thread::sleep, time::Duration};
 
 fn main() {
-    std::env::set_var("RUST_LOG", "DEBUG");
-    env_logger::init();
-
-    info!("Initializing Chip8");
     let mut chip8 = Chip8::new();
-
-    info!("Loading ROM to memory");
     chip8.load_rom(&Path::new("./roms/1-chip8-logo.ch8"));
 
-    info!("Starting Chip8 emulation");
     loop {
         // attempt to simulate 1Mhz
-        thread::sleep(Duration::from_millis(1));
+        sleep(Duration::from_millis(1));
         chip8.cycle();
         chip8.print_display();
     }
@@ -313,10 +305,27 @@ enum Op {
     Subtract(usize, usize),
     /// 8XY7 Subtract vy - vx
     SubtractRev(usize, usize),
+    // 8XY6 (optional behaviour)
+    //ShiftRight, // TODO
+    // 8XYE (optional behaviour)
+    //ShiftLeft, // TODO
     /// 9XY0
     SkipIfNotEq(usize, usize),
     /// ANNN
     SetI(usize),
+    /// BNNN
+    /// CXNN
     /// DXYN
     Draw(usize, usize, usize),
+    // EX9E
+    // EXA1
+    // FX07
+    // FX15
+    // FX18
+    // FX1E
+    // FX0A
+    // FX29
+    // FX33
+    // FX55
+    // FX65
 }
