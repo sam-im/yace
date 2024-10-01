@@ -122,7 +122,9 @@ impl Chip8 {
                 0x3 => Op::Xor(vec[1], vec[2]),
                 0x4 => Op::Add(vec[1], vec[2]),
                 0x5 => Op::Subtract(vec[1], vec[2]),
+                0x6 => Op::ShiftRight(vec[1], vec[2]),
                 0x7 => Op::SubtractRev(vec[1], vec[2]),
+                0xE => Op::ShiftLeft(vec[1], vec[2]),
                 _ => panic!("Error decoding opcode: {}", opcode),
             }
             0x9 => Op::SkipIfNotEq(vec[1], vec[2]),
@@ -203,6 +205,14 @@ impl Chip8 {
                 self.registers.v[15] = if underflow { 0 } else { 1 };
                 self.registers.v[vx] = save;
             },
+            Op::ShiftRight(vx, vy) => {
+                let y = self.registers.v[vy];
+                self.registers.v[0xF] = 0;
+                if let None = y.checked_shr(1) {
+                    self.registers.v[0xF] = 1;
+                }
+                self.registers.v[vx] = y >> 1;
+            },
             Op::SubtractRev(vx, vy) => {
                 let x = self.registers.v[vx];
                 let y = self.registers.v[vy];
@@ -212,7 +222,15 @@ impl Chip8 {
 
                 self.registers.v[15] = if underflow { 0 } else { 1 };
                 self.registers.v[vx] = save;
-            }
+            },
+            Op::ShiftLeft(vx, vy) => {
+                let y = self.registers.v[vy];
+                self.registers.v[0xF] = 0;
+                if let None = y.checked_shl(1) {
+                    self.registers.v[0xF] = 1;
+                }
+                self.registers.v[vx] = y << 1;
+            },
             Op::SkipIfNotEq(vx, vy) => if self.registers.v[vx] != self.registers.v[vy] { self.pc += 2; },
             Op::SetI(addr) => self.registers.i = addr,
             Op::CallSubroutine(addr) => {
@@ -305,10 +323,10 @@ enum Op {
     Subtract(usize, usize),
     /// 8XY7 Subtract vy - vx
     SubtractRev(usize, usize),
-    // 8XY6 (optional behaviour)
-    //ShiftRight, // TODO
-    // 8XYE (optional behaviour)
-    //ShiftLeft, // TODO
+    /// 8XY6 Shift right
+    ShiftRight(usize, usize),
+    /// 8XYE Shift left
+    ShiftLeft(usize, usize),
     /// 9XY0
     SkipIfNotEq(usize, usize),
     /// ANNN
