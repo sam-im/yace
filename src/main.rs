@@ -129,6 +129,8 @@ impl Chip8 {
             }
             0x9 => Op::SkipIfNotEq(vec[1], vec[2]),
             0xA => Op::SetI((0x0FFF & opcode).into()),
+            0xB => Op::JumpWithOffset((0x0FFF & opcode).into()),
+            0xC => Op::Random(vec[1], (0x00FF & opcode) as u8),
             0xD => Op::Draw(vec[1], vec[2], vec[3]),
             _ => panic!("Error decoding opcode: {}", opcode),
         }
@@ -233,6 +235,8 @@ impl Chip8 {
             },
             Op::SkipIfNotEq(vx, vy) => if self.registers.v[vx] != self.registers.v[vy] { self.pc += 2; },
             Op::SetI(addr) => self.registers.i = addr,
+            Op::JumpWithOffset(addr) => self.pc = addr + self.registers.v[0x0] as usize,
+            Op::Random(vx, val) => self.registers.v[vx] = val & fastrand::u8(..),
             Op::CallSubroutine(addr) => {
                 self.stack.push(self.pc);
                 self.pc = addr;
@@ -331,8 +335,10 @@ enum Op {
     SkipIfNotEq(usize, usize),
     /// ANNN
     SetI(usize),
-    /// BNNN
-    /// CXNN
+    /// BNNN Jump with offset TODO: optional behaviour
+    JumpWithOffset(usize),
+    /// CXNN Generate a random number, binary AND with NN, put the value in VX
+    Random(usize, u8),
     /// DXYN
     Draw(usize, usize, usize),
     // EX9E
