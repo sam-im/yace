@@ -109,7 +109,7 @@ impl Chip8 {
                 [0x0, 0xE, 0x0] => Op::ClearScreen,
                 [0x0, 0xE, 0xE] => Op::RetSubroutine,
                 _ => panic!("Error decoding opcode: {}", opcode),
-            }
+            },
             0x1 => Op::Jump((0x0FFF & opcode).into()),
             0x2 => Op::CallSubroutine((0x0FFF & opcode).into()),
             0x3 => Op::SkipIfEqImm(vec[1], (0x00FF & opcode) as u8),
@@ -128,7 +128,7 @@ impl Chip8 {
                 0x7 => Op::SubtractRev(vec[1], vec[2]),
                 0xE => Op::ShiftLeft(vec[1], vec[2]),
                 _ => panic!("Error decoding opcode: {}", opcode),
-            }
+            },
             0x9 => Op::SkipIfNotEq(vec[1], vec[2]),
             0xA => Op::SetI((0x0FFF & opcode).into()),
             0xB => Op::JumpWithOffset((0x0FFF & opcode).into()),
@@ -141,8 +141,11 @@ impl Chip8 {
             },
             0xF => match [vec[2], vec[3]] {
                 [0x0, 0x7] => Op::GetDelayTimer(vec[1]),
+                [0x0, 0xA] => Op::GetKey(vec[1]),
                 [0x1, 0x5] => Op::SetDelayTimer(vec[1]),
                 [0x1, 0x8] => Op::SetSoundTimer(vec[1]),
+                [0x1, 0xE] => Op::AddToIndex(vec[1]),
+                [0x2, 0x9] => Op::FontChar(vec[1]),
                 _ => panic!("Error decoding opcode: {}", opcode),
             },
             _ => panic!("Error decoding opcode: {}", opcode),
@@ -156,18 +159,30 @@ impl Chip8 {
             Op::AddImm(vx, val) => self.registers.v[vx as usize] += val,
             Op::Jump(addr) => self.pc = addr,
             Op::SetImm(vx, val) => self.registers.v[vx] = val,
-            Op::SkipIfEqImm(vx, val) => if self.registers.v[vx] == val { self.pc += 2; },
-            Op::SkipIfNotEqImm(vx, val) => if self.registers.v[vx] != val { self.pc += 2; },
-            Op::SkipIfEq(vx, vy) => if self.registers.v[vx] == self.registers.v[vy] { self.pc += 2 },
+            Op::SkipIfEqImm(vx, val) => {
+                if self.registers.v[vx] == val {
+                    self.pc += 2;
+                }
+            }
+            Op::SkipIfNotEqImm(vx, val) => {
+                if self.registers.v[vx] != val {
+                    self.pc += 2;
+                }
+            }
+            Op::SkipIfEq(vx, vy) => {
+                if self.registers.v[vx] == self.registers.v[vy] {
+                    self.pc += 2
+                }
+            }
             Op::Set(vx, vy) => self.registers.v[vx] = self.registers.v[vy],
             Op::Or(vx, vy) => {
                 let save = self.registers.v[vx] | self.registers.v[vy];
                 self.registers.v[vx] = save;
-            },
+            }
             Op::And(vx, vy) => {
                 let save = self.registers.v[vx] & self.registers.v[vy];
                 self.registers.v[vx] = save;
-            },
+            }
             Op::Xor(vx, vy) => {
                 let save = self.registers.v[vx] ^ self.registers.v[vy];
                 self.registers.v[vx] = save;
@@ -179,7 +194,7 @@ impl Chip8 {
                 let save = x.wrapping_add(y);
                 self.registers.v[15] = if overflow { 1 } else { 0 };
                 self.registers.v[vx] = save;
-            },
+            }
             Op::Subtract(vx, vy) => {
                 let x = self.registers.v[vx];
                 let y = self.registers.v[vy];
@@ -189,7 +204,7 @@ impl Chip8 {
 
                 self.registers.v[15] = if underflow { 0 } else { 1 };
                 self.registers.v[vx] = save;
-            },
+            }
             Op::ShiftRight(vx, vy) => {
                 let y = self.registers.v[vy];
                 self.registers.v[0xF] = 0;
@@ -197,7 +212,7 @@ impl Chip8 {
                     self.registers.v[0xF] = 1;
                 }
                 self.registers.v[vx] = y >> 1;
-            },
+            }
             Op::SubtractRev(vx, vy) => {
                 let x = self.registers.v[vx];
                 let y = self.registers.v[vy];
@@ -207,7 +222,7 @@ impl Chip8 {
 
                 self.registers.v[15] = if underflow { 0 } else { 1 };
                 self.registers.v[vx] = save;
-            },
+            }
             Op::ShiftLeft(vx, vy) => {
                 let y = self.registers.v[vy];
                 self.registers.v[0xF] = 0;
@@ -215,8 +230,12 @@ impl Chip8 {
                     self.registers.v[0xF] = 1;
                 }
                 self.registers.v[vx] = y << 1;
-            },
-            Op::SkipIfNotEq(vx, vy) => if self.registers.v[vx] != self.registers.v[vy] { self.pc += 2; },
+            }
+            Op::SkipIfNotEq(vx, vy) => {
+                if self.registers.v[vx] != self.registers.v[vy] {
+                    self.pc += 2;
+                }
+            }
             Op::SetI(addr) => self.registers.i = addr,
             Op::JumpWithOffset(addr) => self.pc = addr + self.registers.v[0x0] as usize,
             Op::Random(vx, val) => self.registers.v[vx] = val & fastrand::u8(..),
@@ -249,16 +268,48 @@ impl Chip8 {
                         break;
                     }
                 }
-            },
-            Op::SkipIfKeyDown(vx) => if self.keypad[vx] { self.pc += 2 },
-            Op::SkipIfKeyUp(vx) => if !self.keypad[vx] { self.pc += 2 },
+            }
+            Op::SkipIfKeyDown(vx) => {
+                if self.keypad[vx] {
+                    self.pc += 2
+                }
+            }
+            Op::SkipIfKeyUp(vx) => {
+                if !self.keypad[vx] {
+                    self.pc += 2
+                }
+            }
             Op::GetDelayTimer(vx) => self.registers.v[vx] = self.timer_delay,
             Op::SetDelayTimer(vx) => self.timer_delay = self.registers.v[vx],
             Op::SetSoundTimer(vx) => self.timer_sound = self.registers.v[vx],
+            Op::AddToIndex(vx) => {
+                let x = self.registers.v[vx] as usize;
+                let sum = x + self.registers.i;
+                // the valid address range (0x000 - 0xFFF)
+                if sum > 0xFFF {
+                    self.registers.v[0xF] = 1;
+                }
+                self.registers.i = sum;
+            }
+            Op::GetKey(vx) => {
+                self.pc -= 2;
+                for (i, key) in self.keypad.iter().enumerate() {
+                    if *key {
+                        self.pc += 2;
+                        self.registers.v[vx] = i as u8;
+                        break;
+                    }
+                }
+            }
+            Op::FontChar(vx) => {
+                // The character is stored only in the last nibble of VX
+                let char_addr: usize = (0x0F & self.registers.v[vx]).into();
+                self.registers.i = FONTSET_START_ADDR + char_addr;
+            }
             Op::CallSubroutine(addr) => {
                 self.stack.push(self.pc);
                 self.pc = addr;
-            },
+            }
             Op::RetSubroutine => self.pc = self.stack.pop().unwrap(),
         }
     }
@@ -282,10 +333,7 @@ struct Registers {
 
 impl Registers {
     fn new() -> Self {
-        Self {
-            v: [0; 16],
-            i: 0,
-        }
+        Self { v: [0; 16], i: 0 }
     }
 }
 
@@ -369,10 +417,15 @@ enum Op {
     SetDelayTimer(usize),
     /// FX18: Set the sound timer to the value of VX
     SetSoundTimer(usize),
-    // FX1E
-    // FX0A
-    // FX29
+    /// FX1E: Add the value in VX to index register
+    AddToIndex(usize),
+    /// FX0A: Stop execution until a key is pressed, store the key in VX
+    GetKey(usize),
+    /// FX29: Set the index register to a font character sprite specified in VX
+    FontChar(usize),
     // FX33
     // FX55
     // FX65
 }
+
+// TODO rom name as arg
