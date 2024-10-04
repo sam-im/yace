@@ -45,6 +45,7 @@ pub struct Chip8 {
     timer_delay: u8,
     timer_sound: u8,
     pub display: [bool; 64 * 32],
+    keyboard: [bool; 16],
 }
 
 impl Chip8 {
@@ -132,6 +133,17 @@ impl Chip8 {
             0xB => Op::JumpWithOffset((0x0FFF & opcode).into()),
             0xC => Op::Random(vec[1], (0x00FF & opcode) as u8),
             0xD => Op::Draw(vec[1], vec[2], vec[3]),
+            0xE => match [vec[2], vec[3]] {
+                [0x9, 0xE] => Op::SkipIfKeyDown(vec[1]),
+                [0xA, 0x1] => Op::SkipIfKeyUp(vec[1]),
+                _ => panic!("Error decoding opcode: {}", opcode),
+            },
+            0xF => match [vec[2], vec[3]] {
+                [0x0, 0x7] => Op::GetDelayTimer(vec[1]),
+                [0x1, 0x5] => Op::SetDelayTimer(vec[1]),
+                [0x1, 0x8] => Op::SetSoundTimer(vec[1]),
+                _ => panic!("Error decoding opcode: {}", opcode),
+            },
             _ => panic!("Error decoding opcode: {}", opcode),
         }
     }
@@ -141,36 +153,6 @@ impl Chip8 {
         match op {
             Op::ClearScreen => self.display.fill(false),
             Op::AddImm(vx, val) => self.registers.v[vx as usize] += val,
-            Op::Draw(vx, vy, row) => {
-                let x_coord = (self.registers.v[vx] % 64) as usize;
-                let y_coord = (self.registers.v[vy] % 32) as usize;
-                self.registers.v[15] = 0;
-                let sprite_addr = self.registers.i;
-                let bitmask: u8 = 0b1000_0000;
-
-                for i in 0..row {
-                    let sprite_byte = self.memory.get_byte(&sprite_addr + i);
-                    for j in 0..8 {
-                        if x_coord + j > 64 {
-                            break;
-                        }
-                        let display_index = 64 * (y_coord + i) + x_coord + j;
-                        let current_pixel = self.display[display_index];
-                        // gets the value of a single bit from the row
-                        let sprite_pixel: bool = ((bitmask >> j) & sprite_byte).count_ones() > 0;
-
-                        if current_pixel & sprite_pixel {
-                            self.display[display_index] = false;
-                            self.registers.v[15] = 1;
-                        } else {
-                            self.display[display_index] = sprite_pixel;
-                        }
-                    }
-                    if y_coord + i > 32 {
-                        break;
-                    }
-                }
-            },
             Op::Jump(addr) => self.pc = addr,
             Op::SetImm(vx, val) => self.registers.v[vx] = val,
             Op::SkipIfEqImm(vx, val) => if self.registers.v[vx] == val { self.pc += 2; },
@@ -237,6 +219,41 @@ impl Chip8 {
             Op::SetI(addr) => self.registers.i = addr,
             Op::JumpWithOffset(addr) => self.pc = addr + self.registers.v[0x0] as usize,
             Op::Random(vx, val) => self.registers.v[vx] = val & fastrand::u8(..),
+            Op::Draw(vx, vy, row) => {
+                let x_coord = (self.registers.v[vx] % 64) as usize;
+                let y_coord = (self.registers.v[vy] % 32) as usize;
+                self.registers.v[15] = 0;
+                let sprite_addr = self.registers.i;
+                let bitmask: u8 = 0b1000_0000;
+
+                for i in 0..row {
+                    let sprite_byte = self.memory.get_byte(&sprite_addr + i);
+                    for j in 0..8 {
+                        if x_coord + j > 64 {
+                            break;
+                        }
+                        let display_index = 64 * (y_coord + i) + x_coord + j;
+                        let current_pixel = self.display[display_index];
+                        // gets the value of a single bit from the row
+                        let sprite_pixel: bool = ((bitmask >> j) & sprite_byte).count_ones() > 0;
+
+                        if current_pixel & sprite_pixel {
+                            self.display[display_index] = false;
+                            self.registers.v[15] = 1;
+                        } else {
+                            self.display[display_index] = sprite_pixel;
+                        }
+                    }
+                    if y_coord + i > 32 {
+                        break;
+                    }
+                }
+            },
+            Op::SkipIfKeyDown(vx) => if self.keyboard[vx] { self.pc += 2 },
+            Op::SkipIfKeyUp(vx) => if !self.keyboard[vx] { self.pc += 2 },
+            Op::GetDelayTimer(vx) => self.registers.v[vx] = self.timer_delay,
+            Op::SetDelayTimer(vx) => self.timer_delay = self.registers.v[vx],
+            Op::SetSoundTimer(vx) => self.timer_sound = self.registers.v[vx],
             Op::CallSubroutine(addr) => {
                 self.stack.push(self.pc);
                 self.pc = addr;
@@ -341,11 +358,16 @@ enum Op {
     Random(usize, u8),
     /// DXYN
     Draw(usize, usize, usize),
-    // EX9E
-    // EXA1
-    // FX07
-    // FX15
-    // FX18
+    /// EX9E: Skip next instruction if key in VX is pressed
+    SkipIfKeyDown(usize),
+    /// EXA1: Skip next instruction if key in VX is not pressed
+    SkipIfKeyUp(usize),
+    /// FX07: Set VX to the current value of the delay timer
+    GetDelayTimer(usize),
+    /// FX15: Set the delay timer to the value of VX
+    SetDelayTimer(usize),
+    /// FX18: Set the sound timer to the value of VX
+    SetSoundTimer(usize),
     // FX1E
     // FX0A
     // FX29
