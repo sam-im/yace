@@ -146,6 +146,9 @@ impl Chip8 {
                 [0x1, 0x8] => Op::SetSoundTimer(vec[1]),
                 [0x1, 0xE] => Op::AddToIndex(vec[1]),
                 [0x2, 0x9] => Op::FontChar(vec[1]),
+                [0x3, 0x3] => Op::BCDConv(vec[1]),
+                [0x5, 0x5] => Op::StoreMem(vec[1]),
+                [0x6, 0x5] => Op::LoadMem(vec[1]),
                 _ => panic!("Error decoding opcode: {}", opcode),
             },
             _ => panic!("Error decoding opcode: {}", opcode),
@@ -305,7 +308,27 @@ impl Chip8 {
                 // The character is stored only in the last nibble of VX
                 let char_addr: usize = (0x0F & self.registers.v[vx]).into();
                 self.registers.i = FONTSET_START_ADDR + char_addr;
-            }
+            },
+            Op::BCDConv(vx) => {
+                let addr = self.registers.i;
+                let mut x = self.registers.v[vx];
+                for i in 0..3 {
+                    self.memory.bytes[addr + i] = x % 10;
+                    x /= 10;
+                }
+            },
+            Op::StoreMem(vx) => {
+                let addr = self.registers.i;
+                for i in 0..=vx {
+                    self.memory.bytes[addr + i] = self.registers.v[i];
+                }
+            },
+            Op::LoadMem(vx) => {
+                let addr = self.registers.i;
+                for i in 0..=vx {
+                    self.registers.v[i] = self.memory.bytes[addr + i];
+                }
+            },
             Op::CallSubroutine(addr) => {
                 self.stack.push(self.pc);
                 self.pc = addr;
@@ -423,9 +446,12 @@ enum Op {
     GetKey(usize),
     /// FX29: Set the index register to a font character sprite specified in VX
     FontChar(usize),
-    // FX33
-    // FX55
-    // FX65
+    /// FX33: Binary-coded decimal conversion
+    BCDConv(usize),
+    /// FX55: Store register to memory
+    StoreMem(usize),
+    /// FX65: Load register from memory
+    LoadMem(usize),
 }
 
 // TODO rom name as arg
