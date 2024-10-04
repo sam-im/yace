@@ -45,7 +45,7 @@ pub struct Chip8 {
     timer_delay: u8,
     timer_sound: u8,
     pub display: [bool; 64 * 32],
-    keyboard: [bool; 16],
+    keypad: [bool; 16],
 }
 
 impl Chip8 {
@@ -61,6 +61,7 @@ impl Chip8 {
             timer_delay: 0,
             timer_sound: 0,
             display: [false; 64 * 32],
+            keypad: [false; 16],
         }
     }
 
@@ -249,8 +250,8 @@ impl Chip8 {
                     }
                 }
             },
-            Op::SkipIfKeyDown(vx) => if self.keyboard[vx] { self.pc += 2 },
-            Op::SkipIfKeyUp(vx) => if !self.keyboard[vx] { self.pc += 2 },
+            Op::SkipIfKeyDown(vx) => if self.keypad[vx] { self.pc += 2 },
+            Op::SkipIfKeyUp(vx) => if !self.keypad[vx] { self.pc += 2 },
             Op::GetDelayTimer(vx) => self.registers.v[vx] = self.timer_delay,
             Op::SetDelayTimer(vx) => self.timer_delay = self.registers.v[vx],
             Op::SetSoundTimer(vx) => self.timer_sound = self.registers.v[vx],
