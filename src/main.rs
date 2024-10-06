@@ -2,7 +2,7 @@ use std::{path::Path, thread::sleep, time::Duration};
 
 fn main() {
     let mut chip8 = Chip8::new();
-    chip8.load_rom(&Path::new("./roms/3-corax+.ch8"));
+    chip8.load_rom(Path::new("./roms/3-corax+.ch8"));
     chip8.memory.load_bytes(&[0x1], &0x1FF);
 
     loop {
@@ -96,12 +96,12 @@ impl Chip8 {
 
     fn decode(&self, opcode: u16) -> Op {
         let bitmask: u16 = 0b1111_0000_0000_0000;
-        let mut vec = [0 as usize; 4];
+        let mut vec = [0; 4];
 
-        for i in 0..=3 {
-            let masked = (bitmask >> i * 4) & opcode;
+        for i in 0..4 {
+            let masked = (bitmask >> (i * 4)) & opcode;
             // get the next four bits
-            let nibble = masked >> (3 - i) * 4;
+            let nibble = masked >> ((3 - i) * 4);
             vec[i] = nibble as usize;
         }
 
@@ -197,7 +197,7 @@ impl Chip8 {
 
                 self.registers.v[0xF] = 0;
 
-                if let None = x.checked_add(y) {
+                if x.checked_add(y).is_none() {
                     self.registers.v[0xF] = 1;
                 };
 
@@ -210,7 +210,7 @@ impl Chip8 {
 
                 self.registers.v[0xF] = 0;
 
-                if let None = x.checked_sub(y) {
+                if x.checked_sub(y).is_none() {
                     self.registers.v[0xF] = 1;
                 };
 
@@ -231,7 +231,7 @@ impl Chip8 {
                 let y = self.registers.v[vy];
 
                 self.registers.v[0xF] = 0;
-                if let None = y.checked_sub(x) {
+                if y.checked_sub(x).is_none() {
                     self.registers.v[0xF] = 1;
                 }
                 let save = y.wrapping_sub(x);
@@ -262,7 +262,7 @@ impl Chip8 {
                 let bitmask: u8 = 0b1000_0000;
 
                 for i in 0..row {
-                    let sprite_byte = self.memory.get_byte(&sprite_addr + i);
+                    let sprite_byte = self.memory.get_byte(sprite_addr + i);
                     for j in 0..8 {
                         if x_coord + j > 64 {
                             break;
@@ -327,14 +327,12 @@ impl Chip8 {
 
                 let mut digits: Vec<u8> = Vec::new();
                 digits.push(x / 100);
-                x = x % 100;
+                x %= 100;
                 digits.push(x / 10);
-                x = x % 10;
+                x %= 10;
                 digits.push(x);
 
-                for i in 0..=2 {
-                    self.memory.bytes[addr + i] = digits[i];
-                }
+                self.memory.bytes[addr..(3 + addr)].copy_from_slice(&digits[..3]);
             }
             Op::StoreMem(vx) => {
                 let addr = self.registers.i;
@@ -386,7 +384,7 @@ struct Memory {
 
 impl Memory {
     fn new() -> Self {
-        let bytes = [0 as u8; 4096];
+        let bytes = [0_u8; 4096];
 
         Self { bytes }
     }
