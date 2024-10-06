@@ -2,7 +2,8 @@ use std::{path::Path, thread::sleep, time::Duration};
 
 fn main() {
     let mut chip8 = Chip8::new();
-    chip8.load_rom(&Path::new("./roms/1-chip8-logo.ch8"));
+    chip8.load_rom(&Path::new("./roms/3-corax+.ch8"));
+    chip8.memory.load_bytes(&[0x1], &0x1FF);
 
     loop {
         // attempt to simulate 1Mhz
@@ -159,7 +160,7 @@ impl Chip8 {
     fn execute(&mut self, op: Op) {
         match op {
             Op::ClearScreen => self.display.fill(false),
-            Op::AddImm(vx, val) => self.registers.v[vx as usize] += val,
+            Op::AddImm(vx, val) => self.registers.v[vx] = self.registers.v[vx].wrapping_add(val),
             Op::Jump(addr) => self.pc = addr,
             Op::SetImm(vx, val) => self.registers.v[vx] = val,
             Op::SkipIfEqImm(vx, val) => {
@@ -193,43 +194,54 @@ impl Chip8 {
             Op::Add(vx, vy) => {
                 let x = self.registers.v[vx];
                 let y = self.registers.v[vy];
-                let overflow = (x + y) as u16 > 255;
+
+                self.registers.v[0xF] = 0;
+
+                if let None = x.checked_add(y) {
+                    self.registers.v[0xF] = 1;
+                };
+
                 let save = x.wrapping_add(y);
-                self.registers.v[15] = if overflow { 1 } else { 0 };
                 self.registers.v[vx] = save;
             }
             Op::Subtract(vx, vy) => {
                 let x = self.registers.v[vx];
                 let y = self.registers.v[vy];
 
-                let underflow = x < y;
-                let save = x.wrapping_sub(y);
+                self.registers.v[0xF] = 0;
 
-                self.registers.v[15] = if underflow { 0 } else { 1 };
+                if let None = x.checked_sub(y) {
+                    self.registers.v[0xF] = 1;
+                };
+
+                let save = x.wrapping_sub(y);
                 self.registers.v[vx] = save;
             }
             Op::ShiftRight(vx, vy) => {
                 let y = self.registers.v[vy];
                 self.registers.v[0xF] = 0;
-                if let None = y.checked_shr(1) {
+                if 0b0000_0001 & y > 0b0 {
+                    // check rightmost bit for 1
                     self.registers.v[0xF] = 1;
                 }
-                self.registers.v[vx] = y >> 1;
+                self.registers.v[vx] = y.wrapping_shr(1);
             }
             Op::SubtractRev(vx, vy) => {
                 let x = self.registers.v[vx];
                 let y = self.registers.v[vy];
 
-                let underflow = y < x;
+                self.registers.v[0xF] = 0;
+                if let None = y.checked_sub(x) {
+                    self.registers.v[0xF] = 1;
+                }
                 let save = y.wrapping_sub(x);
-
-                self.registers.v[15] = if underflow { 0 } else { 1 };
                 self.registers.v[vx] = save;
             }
             Op::ShiftLeft(vx, vy) => {
                 let y = self.registers.v[vy];
                 self.registers.v[0xF] = 0;
-                if let None = y.checked_shl(1) {
+                if 0b1000_0000 & y > 0b0 {
+                    // check leftmost bit for 1
                     self.registers.v[0xF] = 1;
                 }
                 self.registers.v[vx] = y << 1;
@@ -308,27 +320,34 @@ impl Chip8 {
                 // The character is stored only in the last nibble of VX
                 let char_addr: usize = (0x0F & self.registers.v[vx]).into();
                 self.registers.i = FONTSET_START_ADDR + char_addr;
-            },
+            }
             Op::BCDConv(vx) => {
                 let addr = self.registers.i;
                 let mut x = self.registers.v[vx];
-                for i in 0..3 {
-                    self.memory.bytes[addr + i] = x % 10;
-                    x /= 10;
+
+                let mut digits: Vec<u8> = Vec::new();
+                digits.push(x / 100);
+                x = x % 100;
+                digits.push(x / 10);
+                x = x % 10;
+                digits.push(x);
+
+                for i in 0..=2 {
+                    self.memory.bytes[addr + i] = digits[i];
                 }
-            },
+            }
             Op::StoreMem(vx) => {
                 let addr = self.registers.i;
                 for i in 0..=vx {
                     self.memory.bytes[addr + i] = self.registers.v[i];
                 }
-            },
+            }
             Op::LoadMem(vx) => {
                 let addr = self.registers.i;
                 for i in 0..=vx {
                     self.registers.v[i] = self.memory.bytes[addr + i];
                 }
-            },
+            }
             Op::CallSubroutine(addr) => {
                 self.stack.push(self.pc);
                 self.pc = addr;
