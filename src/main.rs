@@ -1,9 +1,18 @@
-use std::{path::Path, thread::sleep, time::Duration};
+// TODO divide main and lib
+// TODO keyboard functionality
+// TODO left corner of the display tends to skip a few pixels, find why and fix
+// TODO configurable loop i.e. a run function
+// TODO test and fix some of the operations
+// TODO optional behaviours for some ops
+
+use std::{env, path::Path, thread::sleep, time::Duration};
 
 fn main() {
+    let args: Vec<String> = env::args().collect();
+    let rom_path = args.get(1).expect("path to the rom file should be given as first argument");
+
     let mut chip8 = Chip8::new();
-    chip8.load_rom(Path::new("./roms/3-corax+.ch8"));
-    chip8.memory.load_bytes(&[0x1], &0x1FF);
+    chip8.load_rom(Path::new(rom_path));
 
     loop {
         // attempt to simulate 1Mhz
@@ -35,7 +44,7 @@ const FONTSET: [u8; 80] = [
     0xF0, 0x80, 0xF0, 0x80, 0x80, // F
 ];
 // Can be placed anywhere in the first 512 bytes
-// But for some reason 0x050 is popular
+// But for some reason 0x50 is popular
 const FONTSET_START_ADDR: usize = 0x50;
 
 pub struct Chip8 {
@@ -109,7 +118,7 @@ impl Chip8 {
             0x0 => match [vec[1], vec[2], vec[3]] {
                 [0x0, 0xE, 0x0] => Op::ClearScreen,
                 [0x0, 0xE, 0xE] => Op::RetSubroutine,
-                _ => panic!("Error decoding opcode: {}", opcode),
+                _ => panic!("Error decoding opcode: {:4x}", opcode),
             },
             0x1 => Op::Jump((0x0FFF & opcode).into()),
             0x2 => Op::CallSubroutine((0x0FFF & opcode).into()),
@@ -128,7 +137,7 @@ impl Chip8 {
                 0x6 => Op::ShiftRight(vec[1], vec[2]),
                 0x7 => Op::SubtractRev(vec[1], vec[2]),
                 0xE => Op::ShiftLeft(vec[1], vec[2]),
-                _ => panic!("Error decoding opcode: {}", opcode),
+                _ => panic!("Error decoding opcode: {:4x}", opcode),
             },
             0x9 => Op::SkipIfNotEq(vec[1], vec[2]),
             0xA => Op::SetI((0x0FFF & opcode).into()),
@@ -138,7 +147,7 @@ impl Chip8 {
             0xE => match [vec[2], vec[3]] {
                 [0x9, 0xE] => Op::SkipIfKeyDown(vec[1]),
                 [0xA, 0x1] => Op::SkipIfKeyUp(vec[1]),
-                _ => panic!("Error decoding opcode: {}", opcode),
+                _ => panic!("Error decoding opcode: {:4x}", opcode),
             },
             0xF => match [vec[2], vec[3]] {
                 [0x0, 0x7] => Op::GetDelayTimer(vec[1]),
@@ -150,9 +159,9 @@ impl Chip8 {
                 [0x3, 0x3] => Op::BCDConv(vec[1]),
                 [0x5, 0x5] => Op::StoreMem(vec[1]),
                 [0x6, 0x5] => Op::LoadMem(vec[1]),
-                _ => panic!("Error decoding opcode: {}", opcode),
+                _ => panic!("Error decoding opcode: {:4x}", opcode),
             },
-            _ => panic!("Error decoding opcode: {}", opcode),
+            _ => panic!("Error decoding opcode: {:4x}", opcode),
         }
     }
 
@@ -441,7 +450,7 @@ enum Op {
     SkipIfNotEq(usize, usize),
     /// ANNN
     SetI(usize),
-    /// BNNN Jump with offset TODO: optional behaviour
+    /// BNNN Jump with offset
     JumpWithOffset(usize),
     /// CXNN Generate a random number, binary AND with NN, put the value in VX
     Random(usize, u8),
@@ -470,5 +479,3 @@ enum Op {
     /// FX65: Load register from memory
     LoadMem(usize),
 }
-
-// TODO rom name as arg
