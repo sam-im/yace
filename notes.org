@@ -1,0 +1,19 @@
+#+title: Notes
+
+Chip8 (crate)
+|-- lib
+|-- cpu
+|   |-- registers
+|   |   |-- general registers V
+|   |   |-- program counter PC
+|   |   |-- delay_timer
+|   |   |-- sound_timer
+|   |-- memory
+|   |   |-- memory
+|   |   |-- stack
+|   |-- operations
+|-- display
+|-- speaker
+|-- keypad
+
+TODO: WasmChip8

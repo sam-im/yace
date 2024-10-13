@@ -5,7 +5,7 @@
 // TODO test and fix some of the operations
 // TODO optional behaviours for some ops
 
-use std::{env, path::Path, thread::sleep, time::Duration};
+use std::{env, path::Path};
 use chip8::Chip8;
 
 fn main() {
@@ -14,11 +14,5 @@ fn main() {
 
     let mut chip8 = Chip8::new();
     chip8.load_rom(Path::new(rom_path));
-
-    loop {
-        // attempt to simulate 1Mhz
-        sleep(Duration::from_millis(1));
-        chip8.cycle();
-        chip8.print_display();
-    }
+    chip8.run();
 }
