@@ -79,73 +79,14 @@ impl Chip8 {
     }
 
     fn decode(&self, opcode: u16) -> Op {
-        let bitmask: u16 = 0b1111_0000_0000_0000;
-        let mut vec = [0; 4];
-
-        for i in 0..4 {
-            let masked = (bitmask >> (i * 4)) & opcode;
-            // get the next four bits
-            let nibble = masked >> ((3 - i) * 4);
-            vec[i] = nibble as usize;
-        }
-
-        match vec[0] {
-            0x0 => match [vec[1], vec[2], vec[3]] {
-                [0x0, 0xE, 0x0] => Op::ClearScreen,
-                [0x0, 0xE, 0xE] => Op::RetSubroutine,
-                _ => panic!("Error decoding opcode: {:4x}", opcode),
-            },
-            0x1 => Op::Jump((0x0FFF & opcode).into()),
-            0x2 => Op::CallSubroutine((0x0FFF & opcode).into()),
-            0x3 => Op::SkipIfEqImm(vec[1], (0x00FF & opcode) as u8),
-            0x4 => Op::SkipIfNotEqImm(vec[1], (0x00FF & opcode) as u8),
-            0x5 => Op::SkipIfEq(vec[1], vec[2]),
-            0x6 => Op::SetImm(vec[1], (0x00FF & opcode) as u8),
-            0x7 => Op::AddImm(vec[1], (0x00FF & opcode) as u8),
-            0x8 => match vec[3] {
-                0x0 => Op::Set(vec[1], vec[2]),
-                0x1 => Op::Or(vec[1], vec[2]),
-                0x2 => Op::And(vec[1], vec[2]),
-                0x3 => Op::Xor(vec[1], vec[2]),
-                0x4 => Op::Add(vec[1], vec[2]),
-                0x5 => Op::Subtract(vec[1], vec[2]),
-                0x6 => Op::ShiftRight(vec[1], vec[2]),
-                0x7 => Op::SubtractRev(vec[1], vec[2]),
-                0xE => Op::ShiftLeft(vec[1], vec[2]),
-                _ => panic!("Error decoding opcode: {:4x}", opcode),
-            },
-            0x9 => Op::SkipIfNotEq(vec[1], vec[2]),
-            0xA => Op::SetI((0x0FFF & opcode).into()),
-            0xB => Op::JumpWithOffset((0x0FFF & opcode).into()),
-            0xC => Op::Random(vec[1], (0x00FF & opcode) as u8),
-            0xD => Op::Draw(vec[1], vec[2], vec[3]),
-            0xE => match [vec[2], vec[3]] {
-                [0x9, 0xE] => Op::SkipIfKeyDown(vec[1]),
-                [0xA, 0x1] => Op::SkipIfKeyUp(vec[1]),
-                _ => panic!("Error decoding opcode: {:4x}", opcode),
-            },
-            0xF => match [vec[2], vec[3]] {
-                [0x0, 0x7] => Op::GetDelayTimer(vec[1]),
-                [0x0, 0xA] => Op::GetKey(vec[1]),
-                [0x1, 0x5] => Op::SetDelayTimer(vec[1]),
-                [0x1, 0x8] => Op::SetSoundTimer(vec[1]),
-                [0x1, 0xE] => Op::AddToIndex(vec[1]),
-                [0x2, 0x9] => Op::FontChar(vec[1]),
-                [0x3, 0x3] => Op::BCDConv(vec[1]),
-                [0x5, 0x5] => Op::StoreMem(vec[1]),
-                [0x6, 0x5] => Op::LoadMem(vec[1]),
-                _ => panic!("Error decoding opcode: {:4x}", opcode),
-            },
-            _ => panic!("Error decoding opcode: {:4x}", opcode),
-        }
+        Op::new(opcode)
     }
 
-    /// All operation implementations
     fn execute(&mut self, op: Op) {
         op.execute(self);
     }
 
-    pub fn cycle(&mut self) {
+    fn cycle(&mut self) {
         let opcode = self.fetch();
         let operation = self.decode(opcode);
         self.execute(operation);
