@@ -15,9 +15,7 @@ use std::thread::sleep;
 use std::time::Duration;
 
 pub struct Chip8 {
-    pc: usize,
     registers: Registers,
-    stack: Vec<usize>, // max depth: 16
     memory: Memory,
     timer_delay: u8,
     timer_sound: u8,
@@ -31,9 +29,7 @@ impl Chip8 {
         memory.load_bytes(&FONTSET, &FONTSET_START_ADDR);
 
         Self {
-            pc: 0x200,
             registers: Registers::new(),
-            stack: Vec::new(),
             memory,
             timer_delay: 0,
             timer_sound: 0,
@@ -70,11 +66,11 @@ impl Chip8 {
 
     fn fetch(&mut self) -> u16 {
         // fetch first byte, shift it left
-        let opcode: u16 = (self.memory.bytes[self.pc] as u16) << 8;
+        let opcode: u16 = (self.memory.bytes[self.registers.pc] as u16) << 8;
         // fetch second byte, OR with shifted bytes to place it on the right side
-        let opcode: u16 = opcode | (self.memory.bytes[self.pc + 1] as u16);
+        let opcode: u16 = opcode | (self.memory.bytes[self.registers.pc + 1] as u16);
 
-        self.pc += 2;
+        self.registers.pc += 2;
         opcode
     }
 

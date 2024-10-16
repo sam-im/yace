@@ -27,13 +27,15 @@ pub const FONTSET: [u8; 80] = [
 
 pub struct Memory {
     pub bytes: [u8; 4096],
+    pub stack: Vec<usize>,
 }
 
 impl Memory {
     pub fn new() -> Self {
         let bytes = [0_u8; 4096];
+        let stack = Vec::new();
 
-        Self { bytes }
+        Self { bytes, stack }
     }
 
     pub fn load_bytes(&mut self, bytes: &[u8], offset: &usize) {

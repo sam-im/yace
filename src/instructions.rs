@@ -140,21 +140,21 @@ impl Op {
         match self {
             Op::ClearScreen => chip8.display.fill(false),
             Op::AddImm(vx, val) => chip8.registers.v[vx] = chip8.registers.v[vx].wrapping_add(val),
-            Op::Jump(addr) => chip8.pc = addr,
+            Op::Jump(addr) => chip8.registers.pc = addr,
             Op::SetImm(vx, val) => chip8.registers.v[vx] = val,
             Op::SkipIfEqImm(vx, val) => {
                 if chip8.registers.v[vx] == val {
-                    chip8.pc += 2;
+                    chip8.registers.pc += 2;
                 }
             }
             Op::SkipIfNotEqImm(vx, val) => {
                 if chip8.registers.v[vx] != val {
-                    chip8.pc += 2;
+                    chip8.registers.pc += 2;
                 }
             }
             Op::SkipIfEq(vx, vy) => {
                 if chip8.registers.v[vx] == chip8.registers.v[vy] {
-                    chip8.pc += 2
+                    chip8.registers.pc += 2
                 }
             }
             Op::Set(vx, vy) => chip8.registers.v[vx] = chip8.registers.v[vy],
@@ -227,11 +227,11 @@ impl Op {
             }
             Op::SkipIfNotEq(vx, vy) => {
                 if chip8.registers.v[vx] != chip8.registers.v[vy] {
-                    chip8.pc += 2;
+                    chip8.registers.pc += 2;
                 }
             }
             Op::SetI(addr) => chip8.registers.i = addr,
-            Op::JumpWithOffset(addr) => chip8.pc = addr + chip8.registers.v[0x0] as usize,
+            Op::JumpWithOffset(addr) => chip8.registers.pc = addr + chip8.registers.v[0x0] as usize,
             Op::Random(vx, val) => chip8.registers.v[vx] = val & fastrand::u8(..),
             Op::Draw(vx, vy, row) => {
                 let x_coord = (chip8.registers.v[vx] % 64) as usize;
@@ -265,12 +265,12 @@ impl Op {
             }
             Op::SkipIfKeyDown(vx) => {
                 if chip8.keypad[vx] {
-                    chip8.pc += 2
+                    chip8.registers.pc += 2
                 }
             }
             Op::SkipIfKeyUp(vx) => {
                 if !chip8.keypad[vx] {
-                    chip8.pc += 2
+                    chip8.registers.pc += 2
                 }
             }
             Op::GetDelayTimer(vx) => chip8.registers.v[vx] = chip8.timer_delay,
@@ -286,10 +286,10 @@ impl Op {
                 chip8.registers.i = sum;
             }
             Op::GetKey(vx) => {
-                chip8.pc -= 2;
+                chip8.registers.pc -= 2;
                 for (i, key) in chip8.keypad.iter().enumerate() {
                     if *key {
-                        chip8.pc += 2;
+                        chip8.registers.pc += 2;
                         chip8.registers.v[vx] = i as u8;
                         break;
                     }
@@ -326,10 +326,10 @@ impl Op {
                 }
             }
             Op::CallSubroutine(addr) => {
-                chip8.stack.push(chip8.pc);
-                chip8.pc = addr;
+                chip8.memory.stack.push(chip8.registers.pc);
+                chip8.registers.pc = addr;
             }
-            Op::RetSubroutine => chip8.pc = chip8.stack.pop().unwrap(),
+            Op::RetSubroutine => chip8.registers.pc = chip8.memory.stack.pop().unwrap(),
         }
     }
 }

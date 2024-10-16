@@ -4,10 +4,11 @@
 pub struct Registers {
     pub v: [u8; 16],
     pub i: usize, // 16-bit index register
+    pub pc: usize,
 }
 
 impl Registers {
     pub fn new() -> Self {
-        Self { v: [0; 16], i: 0 }
+        Self { v: [0; 16], i: 0, pc: 0x200 }
     }
 }
