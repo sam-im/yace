@@ -32,10 +32,12 @@ pub struct Memory {
 
 impl Memory {
     pub fn new() -> Self {
-        let bytes = [0_u8; 4096];
+        let bytes = [0; 4096];
         let stack = Vec::new();
+        let mut mem = Self { bytes, stack };
 
-        Self { bytes, stack }
+        mem.load_bytes(&FONTSET, &FONTSET_START_ADDR);
+        mem
     }
 
     pub fn load_bytes(&mut self, bytes: &[u8], offset: &usize) {

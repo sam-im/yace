@@ -5,9 +5,11 @@ mod memory;
 mod registers;
 mod sound;
 
+use display::DisplayBuffer;
 use instructions::Op;
+use keypad::Keypad;
 use memory::Memory;
-use memory::{FONTSET, FONTSET_START_ADDR, ROM_START_ADDR};
+use memory::ROM_START_ADDR;
 use registers::Registers;
 
 use std::path::Path;
@@ -17,18 +19,15 @@ use std::time::Duration;
 pub struct Chip8 {
     registers: Registers,
     memory: Memory,
-    pub display: [bool; 64 * 32],
-    keypad: [bool; 16],
+    pub display: DisplayBuffer,
+    keypad: Keypad,
 }
 
 impl Chip8 {
     pub fn new() -> Self {
-        let mut memory = Memory::new();
-        memory.load_bytes(&FONTSET, &FONTSET_START_ADDR);
-
         Self {
             registers: Registers::new(),
-            memory,
+            memory: Memory::new(),
             display: [false; 64 * 32],
             keypad: [false; 16],
         }
