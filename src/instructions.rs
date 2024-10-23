@@ -1,5 +1,5 @@
-use crate::Chip8;
 use crate::memory::FONTSET_START_ADDR;
+use crate::Chip8;
 
 pub enum Op {
     /// 00E0
@@ -84,7 +84,7 @@ impl Op {
             vec[i] = nibble as usize;
         }
 
-        let op = match vec[0] {
+        match vec[0] {
             0x0 => match [vec[1], vec[2], vec[3]] {
                 [0x0, 0xE, 0x0] => Op::ClearScreen,
                 [0x0, 0xE, 0xE] => Op::RetSubroutine,
@@ -132,9 +132,7 @@ impl Op {
                 _ => panic!("Error decoding opcode: {:4x}", opcode),
             },
             _ => panic!("Error decoding opcode: {:4x}", opcode),
-        };
-
-        op
+        }
     }
     pub fn execute(self, chip8: &mut Chip8) {
         match self {
@@ -273,9 +271,9 @@ impl Op {
                     chip8.registers.pc += 2
                 }
             }
-            Op::GetDelayTimer(vx) => chip8.registers.v[vx] = chip8.timer_delay,
-            Op::SetDelayTimer(vx) => chip8.timer_delay = chip8.registers.v[vx],
-            Op::SetSoundTimer(vx) => chip8.timer_sound = chip8.registers.v[vx],
+            Op::GetDelayTimer(vx) => chip8.registers.v[vx] = chip8.registers.timer_delay,
+            Op::SetDelayTimer(vx) => chip8.registers.timer_delay = chip8.registers.v[vx],
+            Op::SetSoundTimer(vx) => chip8.registers.timer_sound = chip8.registers.v[vx],
             Op::AddToIndex(vx) => {
                 let x = chip8.registers.v[vx] as usize;
                 let sum = x + chip8.registers.i;

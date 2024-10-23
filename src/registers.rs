@@ -5,10 +5,18 @@ pub struct Registers {
     pub v: [u8; 16],
     pub i: usize, // 16-bit index register
     pub pc: usize,
+    pub timer_delay: u8,
+    pub timer_sound: u8,
 }
 
 impl Registers {
     pub fn new() -> Self {
-        Self { v: [0; 16], i: 0, pc: 0x200 }
+        Self {
+            v: [0; 16],
+            i: 0,
+            pc: 0x200,
+            timer_delay: 0,
+            timer_sound: 0,
+        }
     }
 }

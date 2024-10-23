@@ -1,14 +1,14 @@
 mod display;
-mod sound;
-mod keypad;
 mod instructions;
+mod keypad;
 mod memory;
 mod registers;
+mod sound;
 
-use memory::Memory;
-use registers::Registers;
-use memory::{ROM_START_ADDR, FONTSET_START_ADDR, FONTSET};
 use instructions::Op;
+use memory::Memory;
+use memory::{FONTSET, FONTSET_START_ADDR, ROM_START_ADDR};
+use registers::Registers;
 
 use std::path::Path;
 use std::thread::sleep;
@@ -17,8 +17,6 @@ use std::time::Duration;
 pub struct Chip8 {
     registers: Registers,
     memory: Memory,
-    timer_delay: u8,
-    timer_sound: u8,
     pub display: [bool; 64 * 32],
     keypad: [bool; 16],
 }
@@ -31,8 +29,6 @@ impl Chip8 {
         Self {
             registers: Registers::new(),
             memory,
-            timer_delay: 0,
-            timer_sound: 0,
             display: [false; 64 * 32],
             keypad: [false; 16],
         }
@@ -42,7 +38,7 @@ impl Chip8 {
         loop {
             sleep(Duration::from_millis(1));
             self.cycle();
-            self.print_display();   // debugging
+            self.print_display(); // debugging
         }
     }
 

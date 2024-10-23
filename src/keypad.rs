@@ -1,3 +1,3 @@
 struct Keypad {
-    keys: [bool; 16]
+    keys: [bool; 16],
 }
