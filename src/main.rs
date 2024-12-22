@@ -1,8 +1,5 @@
-// TODO divide main and lib
 // TODO keyboard functionality
-// TODO left corner of the display tends to skip a few pixels, find why and fix
-// TODO configurable loop i.e. a run function
-// TODO test and fix some of the operations
+// TODO timers
 // TODO optional behaviours for some ops
 
 use chip8::Chip8;
@@ -15,6 +12,6 @@ fn main() {
         .expect("path to the rom file should be given as first argument");
 
     let mut chip8 = Chip8::new();
-    chip8.load_rom(Path::new(rom_path));
+    chip8.load_rom_from_file(Path::new(rom_path));
     chip8.run();
 }

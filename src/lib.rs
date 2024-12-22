@@ -20,7 +20,7 @@ pub struct Chip8 {
     registers: Registers,
     memory: Memory,
     pub display: DisplayBuffer,
-    keypad: Keypad,
+    pub keypad: Keypad,
 }
 
 impl Chip8 {
@@ -41,7 +41,11 @@ impl Chip8 {
         }
     }
 
-    pub fn load_rom(&mut self, path: &Path) {
+    pub fn load_rom(&mut self, bytes: &[u8]) {
+        self.memory.load_bytes(bytes, &ROM_START_ADDR);
+    }
+
+    pub fn load_rom_from_file(&mut self, path: &Path) {
         let rom = std::fs::read(path).unwrap();
         self.memory.load_bytes(&rom, &ROM_START_ADDR);
     }
@@ -77,7 +81,7 @@ impl Chip8 {
         op.execute(self);
     }
 
-    fn cycle(&mut self) {
+    pub fn cycle(&mut self) {
         let opcode = self.fetch();
         let operation = self.decode(opcode);
         self.execute(operation);
