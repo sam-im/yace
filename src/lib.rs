@@ -6,6 +6,8 @@ use chip8::Chip8;
 
 #[wasm_bindgen(start)]
 fn main() -> Result<(), JsValue> {
+    init_html()?;
+
     // workaround that loads the rom into the compiled binary, use fetch instead
     let rom = include_bytes!("../pkg/roms/1-chip8-logo.ch8");
     let mut chip8 = Chip8::new();
@@ -20,6 +22,15 @@ fn main() -> Result<(), JsValue> {
     }));
 
     request_animation_frame(g.borrow().as_ref().unwrap());
+    Ok(())
+}
+
+fn init_html() -> Result<(), JsValue> {
+    let elem = document().create_element("canvas")?;
+    elem.set_id("canvas");
+    elem.set_attribute("width", "640")?;
+    elem.set_attribute("height", "320")?;
+    body().append_child(&elem)?;
     Ok(())
 }
 
