@@ -4,6 +4,8 @@ use std::{cell::RefCell, rc::Rc};
 use wasm_bindgen::prelude::*;
 use chip8::Chip8;
 
+const SCALE: f64 = 1.;
+
 #[wasm_bindgen(start)]
 fn main() -> Result<(), JsValue> {
     init_html()?;
@@ -28,21 +30,24 @@ fn main() -> Result<(), JsValue> {
 fn init_html() -> Result<(), JsValue> {
     let elem = document().create_element("canvas")?;
     elem.set_id("canvas");
-    elem.set_attribute("width", "640")?;
-    elem.set_attribute("height", "320")?;
+    let (width, height) = ((640. * SCALE) as usize,
+                           (320. * SCALE) as usize);
+    elem.set_attribute("width", &width.to_string())?;
+    elem.set_attribute("height", &height.to_string())?;
     body().append_child(&elem)?;
     Ok(())
 }
 
 fn draw(display: &[bool]) {
     let ctx = context();
+    let size = 10. * SCALE;
     display.iter().enumerate().for_each(|(i, val)| {
-        let x = (10 * (i % 64)) as f64;
-        let y = (10 * (i / 64) as usize) as f64;
-        ctx.stroke_rect(x, y, 10., 10.);
+        let x = size * (i as f64 % 64.);
+        let y = size * (i as f64 / 64.);
+        ctx.stroke_rect(x, y, size, size);
 
         if *val {
-            ctx.fill_rect(x, y, 10., 10.);
+            ctx.fill_rect(x, y, size, size);
         }
     });
 }
