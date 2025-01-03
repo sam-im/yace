@@ -42,8 +42,8 @@ fn draw(display: &[bool]) {
     let ctx = context();
     let size = 10. * SCALE;
     display.iter().enumerate().for_each(|(i, val)| {
-        let x = size * (i as f64 % 64.);
-        let y = size * (i as f64 / 64.);
+        let x = size * (i % 64) as f64;
+        let y = size * (i / 64) as f64;
         ctx.stroke_rect(x, y, size, size);
 
         if *val {
