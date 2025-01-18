@@ -1,37 +1,56 @@
 mod utils;
 
+use chip8::Chip8;
 use std::{cell::RefCell, rc::Rc};
 use wasm_bindgen::prelude::*;
-use chip8::Chip8;
+use web_sys::js_sys::Date;
 
 const SCALE: f64 = 1.;
 
 #[wasm_bindgen(start)]
 fn main() -> Result<(), JsValue> {
-    init_html()?;
+    utils::set_panic_hook(); // results in bigger size
 
-    // workaround that loads the rom into the compiled binary, use fetch instead
-    let rom = include_bytes!("../pkg/roms/1-chip8-logo.ch8");
-    let mut chip8 = Chip8::new();
-    chip8.load_rom(rom);
+    init_html()?;
+    let mut chip8 = init_chip8()?;
+
+    const TIME_PER_CYCLE: f64 = 0.01;
+    let mut current_time = Date::now();
+    let mut accumulator = 0.0;
 
     let f = Rc::new(RefCell::new(None));
     let g = Rc::clone(&f);
     *g.borrow_mut() = Some(Closure::new(move || {
-        chip8.cycle();
+        let now = Date::now();
+        let dt = now - current_time;
+        current_time = now;
+        accumulator += dt;
+
+        while accumulator >= TIME_PER_CYCLE {
+            chip8.cycle();
+            accumulator = accumulator - TIME_PER_CYCLE;
+        }
+
         draw(&chip8.display);
         request_animation_frame(f.borrow().as_ref().unwrap());
     }));
-
     request_animation_frame(g.borrow().as_ref().unwrap());
+
     Ok(())
+}
+
+fn init_chip8() -> Result<Chip8, JsValue> {
+    // workaround that loads the rom into the compiled binary, use fetch instead
+    let rom = include_bytes!("../pkg/roms/1-chip8-logo.ch8");
+    let mut chip8 = Chip8::new();
+    chip8.load_rom(rom);
+    Ok(chip8)
 }
 
 fn init_html() -> Result<(), JsValue> {
     let elem = document().create_element("canvas")?;
     elem.set_id("canvas");
-    let (width, height) = ((640. * SCALE) as usize,
-                           (320. * SCALE) as usize);
+    let (width, height) = ((640. * SCALE) as usize, (320. * SCALE) as usize);
     elem.set_attribute("width", &width.to_string())?;
     elem.set_attribute("height", &height.to_string())?;
     body().append_child(&elem)?;
@@ -64,7 +83,9 @@ fn request_animation_frame(f: &Closure<dyn FnMut()>) {
 }
 
 fn document() -> web_sys::Document {
-    window().document().expect("should have a document on window")
+    window()
+        .document()
+        .expect("should have a document on window")
 }
 
 fn canvas() -> web_sys::HtmlCanvasElement {
