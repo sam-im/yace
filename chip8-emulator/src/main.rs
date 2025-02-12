@@ -1,5 +1,4 @@
 // TODO keyboard functionality
-// TODO timers
 // TODO optional behaviours for some ops
 
 use chip8::Chip8;

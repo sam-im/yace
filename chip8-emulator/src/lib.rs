@@ -85,7 +85,16 @@ impl Chip8 {
         let opcode = self.fetch();
         let operation = self.decode(opcode);
         self.execute(operation);
+        self.decrement_timers(1);
+    }
 
-        // check to decrement timers
+    fn decrement_timers(&mut self, amount: u8) {
+        // note: the timers are expected to be decremented at a rate of 60 hertz until zero
+        // using saturating_sub prevents underflows in case timers contain 0 as value.
+        let delay = self.registers.timer_delay.saturating_sub(amount);
+        let sound = self.registers.timer_sound.saturating_sub(amount);
+
+        self.registers.timer_delay = delay;
+        self.registers.timer_sound = sound;
     }
 }
