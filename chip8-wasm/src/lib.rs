@@ -6,7 +6,7 @@ use wasm_bindgen::prelude::*;
 use web_sys::js_sys::Date;
 
 const SCALE: f64 = 1.;
-const TIME_PER_CYCLE: f64 = 0.01;
+const TIME_PER_CYCLE: f64 = 0.16;   // amounts to approx. 60hz
 
 #[wasm_bindgen(start)]
 fn main() -> Result<(), JsValue> {
@@ -40,7 +40,7 @@ fn main() -> Result<(), JsValue> {
 
 fn init_chip8() -> Result<Chip8, JsValue> {
     // workaround that loads the rom into the compiled binary, use fetch instead
-    let rom = include_bytes!("../../roms/1-chip8-logo.ch8");
+    let rom = include_bytes!("../../roms/4-flags.ch8");
     let mut chip8 = Chip8::new();
     chip8.load_rom(rom);
     Ok(chip8)
