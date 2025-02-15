@@ -2,73 +2,84 @@ use crate::memory::FONTSET_START_ADDR;
 use crate::Chip8;
 
 pub enum Op {
-    /// 00E0
+    /// 00E0: Clear the screen
     ClearScreen,
     /// 00EE: Return from subroutine
     RetSubroutine,
-    /// 1NNN
+    /// 1NNN: Jump to address NNN
     Jump(usize),
-    /// 2NNN: Call a subroutine
+    /// 2NNN: Call subroutine
     CallSubroutine(usize),
-    /// 3XNN: Skip if VX == NN
+    /// 3XNN: Skip next instruction if register VX == NN
     SkipIfEqImm(usize, u8),
-    /// 4XNN
+    /// 4XNN: Skip next instruction if register VX =! NN
     SkipIfNotEqImm(usize, u8),
-    /// 5XY0
+    /// 5XY0: Skip next instruction if register values VX == VY
     SkipIfEq(usize, usize),
-    /// 6XNN
+    /// 6XNN: Store value NN in register VX
     SetImm(usize, u8),
-    /// 7XNN
+    /// 7XNN: Add the value NN to register VX
     AddImm(usize, u8),
-    /// 8XY0 Set vx to vy
+    /// 8XY0: Set register VX to VY
     Set(usize, usize),
-    /// 8XY1 Binary OR
+    /// 8XY1: Set register VX to VX OR VY
     Or(usize, usize),
-    /// 8XY2 Binary AND
+    /// 8XY2: Set register VX to VX AND VY
     And(usize, usize),
-    /// 8XY3 Logical XOR
+    /// 8XY3: Set register VX to VX XOR VY
     Xor(usize, usize),
-    /// 8XY4 Add
+    /// 8XY4: Add the value of register VY to register VX
+    /// Sets register VF to 1 if a carry occurs, if not set it to 0
     Add(usize, usize),
-    /// 8XY5 Subtract vx - vy
+    /// 8XY5: Subtract the value of register VY from register VX
+    /// Set register VF to 0 if a borrow occurs, if not set it to 1
     Subtract(usize, usize),
-    /// 8XY7 Subtract vy - vx
-    SubtractRev(usize, usize),
-    /// 8XY6 Shift right
+    /// 8XY6: Store the value of register VY shifted right one bit to register VX
+    /// Set register VF to the least significant bit prior to the shift
     ShiftRight(usize, usize),
-    /// 8XYE Shift left
+    /// 8XY7: Set register VX to the value of VY - VX
+    /// Set VF to 0 if a borrow occurs, if not set it to 01
+    SubtractRev(usize, usize),
+    /// 8XYE: Store the value of VY shifted left one bit in register VX
+    /// Set VF to the most significant bit prior to the shift
     ShiftLeft(usize, usize),
-    /// 9XY0
+    /// 9XY0: Skip next instruction if the values of register VX =! VY
     SkipIfNotEq(usize, usize),
-    /// ANNN
+    /// ANNN: Store memory address NNN in register I
     SetI(usize),
-    /// BNNN Jump with offset
+    /// BNNN: Jump to address NNN + V0
     JumpWithOffset(usize),
-    /// CXNN Generate a random number, binary AND with NN, put the value in VX
+    /// CXNN: Set register VX to a random number with a mask of NN
     Random(usize, u8),
-    /// DXYN
+    /// DXYN: Draw a sprite at position VX, VY with N bytes starting from
+    /// the address stored in register I
+    /// Set VF to 1 if any previously set pixel is unset, 0 otherwise
+    /// Explanation: Trying to set an already set pixel results in it being unset.
     Draw(usize, usize, usize),
-    /// EX9E: Skip next instruction if key in VX is pressed
+    /// EX9E: Skip next instruction if the key with the value in VX is pressed
     SkipIfKeyDown(usize),
-    /// EXA1: Skip next instruction if key in VX is not pressed
+    /// EXA1: Skip next instruction if the key with the value in VX is not pressed
     SkipIfKeyUp(usize),
     /// FX07: Set VX to the current value of the delay timer
     GetDelayTimer(usize),
+    /// FX0A: Stop execution until a key is pressed, store the key in VX
+    GetKey(usize),
     /// FX15: Set the delay timer to the value of VX
     SetDelayTimer(usize),
     /// FX18: Set the sound timer to the value of VX
     SetSoundTimer(usize),
     /// FX1E: Add the value in VX to index register
     AddToIndex(usize),
-    /// FX0A: Stop execution until a key is pressed, store the key in VX
-    GetKey(usize),
-    /// FX29: Set the index register to a font character sprite specified in VX
+    /// FX29: Set register I to an address of a font character sprite specified in VX.
     FontChar(usize),
-    /// FX33: Binary-coded decimal conversion
+    /// FX33: Store the binary-coded decimal equivalent of the value stored in register
+    /// VX to addresses I, I + 1, I + 2.
     BCDConv(usize),
-    /// FX55: Store register to memory
+    /// FX55: Store registers V0 to VX inclusive in memory starting at address I,
+    /// I is set to I + X + 1 after operation.
     StoreMem(usize),
-    /// FX65: Load register from memory
+    /// FX65: Store registers V0 to VX inclusive with the values starting from the address
+    /// stored in register I, I is set to I + X + 1 after operation.
     LoadMem(usize),
 }
 
