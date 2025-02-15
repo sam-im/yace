@@ -148,9 +148,12 @@ impl Op {
     pub fn execute(self, chip8: &mut Chip8) {
         match self {
             Op::ClearScreen => chip8.display.fill(false),
-            Op::AddImm(vx, val) => chip8.registers.v[vx] = chip8.registers.v[vx].wrapping_add(val),
+            Op::RetSubroutine => chip8.registers.pc = chip8.memory.stack.pop().unwrap(),
             Op::Jump(addr) => chip8.registers.pc = addr,
-            Op::SetImm(vx, val) => chip8.registers.v[vx] = val,
+            Op::CallSubroutine(addr) => {
+                chip8.memory.stack.push(chip8.registers.pc);
+                chip8.registers.pc = addr;
+            }
             Op::SkipIfEqImm(vx, val) => {
                 if chip8.registers.v[vx] == val {
                     chip8.registers.pc += 2;
@@ -166,6 +169,8 @@ impl Op {
                     chip8.registers.pc += 2
                 }
             }
+            Op::SetImm(vx, val) => chip8.registers.v[vx] = val,
+            Op::AddImm(vx, val) => chip8.registers.v[vx] = chip8.registers.v[vx].wrapping_add(val),
             Op::Set(vx, vy) => chip8.registers.v[vx] = chip8.registers.v[vy],
             Op::Or(vx, vy) => {
                 let save = chip8.registers.v[vx] | chip8.registers.v[vy];
@@ -207,11 +212,10 @@ impl Op {
             }
             Op::ShiftRight(vx, vy) => {
                 let y = chip8.registers.v[vy];
-                chip8.registers.v[0xF] = 0;
-                if 0b0000_0001 & y > 0b0 {
-                    // check rightmost bit for 1
-                    chip8.registers.v[0xF] = 1;
-                }
+
+                // set VF to the least significant bit prior to shift
+                chip8.registers.v[0xF] = 0b000_0001 & y;
+
                 chip8.registers.v[vx] = y.wrapping_shr(1);
             }
             Op::SubtractRev(vx, vy) => {
@@ -222,17 +226,15 @@ impl Op {
                 if y.checked_sub(x).is_none() {
                     chip8.registers.v[0xF] = 1;
                 }
+
                 let save = y.wrapping_sub(x);
                 chip8.registers.v[vx] = save;
             }
             Op::ShiftLeft(vx, vy) => {
                 let y = chip8.registers.v[vy];
-                chip8.registers.v[0xF] = 0;
-                if 0b1000_0000 & y > 0b0 {
-                    // check leftmost bit for 1
-                    chip8.registers.v[0xF] = 1;
-                }
-                chip8.registers.v[vx] = y << 1;
+                // set VF to the most significant bit prior to shift
+                chip8.registers.v[0xF] = 0b1000_0000 & y;
+                chip8.registers.v[vx] = y.wrapping_shl(1);
             }
             Op::SkipIfNotEq(vx, vy) => {
                 if chip8.registers.v[vx] != chip8.registers.v[vy] {
@@ -283,6 +285,16 @@ impl Op {
                 }
             }
             Op::GetDelayTimer(vx) => chip8.registers.v[vx] = chip8.registers.timer_delay,
+            Op::GetKey(vx) => {
+                chip8.registers.pc -= 2;
+                for (i, key) in chip8.keypad.iter().enumerate() {
+                    if *key {
+                        chip8.registers.pc += 2;
+                        chip8.registers.v[vx] = i as u8;
+                        break;
+                    }
+                }
+            }
             Op::SetDelayTimer(vx) => chip8.registers.timer_delay = chip8.registers.v[vx],
             Op::SetSoundTimer(vx) => chip8.registers.timer_sound = chip8.registers.v[vx],
             Op::AddToIndex(vx) => {
@@ -293,16 +305,6 @@ impl Op {
                     chip8.registers.v[0xF] = 1;
                 }
                 chip8.registers.i = sum;
-            }
-            Op::GetKey(vx) => {
-                chip8.registers.pc -= 2;
-                for (i, key) in chip8.keypad.iter().enumerate() {
-                    if *key {
-                        chip8.registers.pc += 2;
-                        chip8.registers.v[vx] = i as u8;
-                        break;
-                    }
-                }
             }
             Op::FontChar(vx) => {
                 // The character is stored only in the last nibble of VX
@@ -327,18 +329,16 @@ impl Op {
                 for i in 0..=vx {
                     chip8.memory.bytes[addr + i] = chip8.registers.v[i];
                 }
+                chip8.registers.i = addr + vx + 1;
+
             }
             Op::LoadMem(vx) => {
                 let addr = chip8.registers.i;
                 for i in 0..=vx {
                     chip8.registers.v[i] = chip8.memory.bytes[addr + i];
                 }
+                chip8.registers.i = addr + vx + 1;
             }
-            Op::CallSubroutine(addr) => {
-                chip8.memory.stack.push(chip8.registers.pc);
-                chip8.registers.pc = addr;
-            }
-            Op::RetSubroutine => chip8.registers.pc = chip8.memory.stack.pop().unwrap(),
         }
     }
 }
