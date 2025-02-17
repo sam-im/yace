@@ -47,12 +47,13 @@ fn init_chip8() -> Result<Chip8, JsValue> {
 }
 
 fn init_html() -> Result<(), JsValue> {
-    let elem = utils::document().create_element("canvas")?;
-    elem.set_id("canvas");
+    let canvas = utils::document().get_element_by_id("canvas").unwrap();
     let (width, height) = ((640. * SCALE) as usize, (320. * SCALE) as usize);
-    elem.set_attribute("width", &width.to_string())?;
-    elem.set_attribute("height", &height.to_string())?;
-    utils::body().append_child(&elem)?;
+    canvas.set_attribute("width", &width.to_string())?;
+    canvas.set_attribute("height", &height.to_string())?;
+
+    // TODO implement buttons, select-rom, upload rom
+
     Ok(())
 }
 
