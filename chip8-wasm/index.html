@@ -13,7 +13,7 @@
       }
       .keypad {
           display: grid;
-          grid-template-columns: repeat(3, 60px);
+          grid-template-columns: repeat(4, 60px);
           gap: 5px;
       }
       select {
@@ -25,21 +25,29 @@
   <body>
     <canvas id="canvas"></canvas>
     <div class="keypad">
-      <button>1</button>
-      <button>2</button>
-      <button>3</button>
-      <button>4</button>
-      <button>5</button>
-      <button>6</button>
-      <button>7</button>
-      <button>8</button>
-      <button>9</button>
+      <button id="1">1</button>
+      <button id="2">2</button>
+      <button id="3">3</button>
+      <button id="C">C</button>
+      <button id="4">4</button>
+      <button id="5">5</button>
+      <button id="6">6</button>
+      <button id="D">D</button>
+      <button id="7">7</button>
+      <button id="8">8</button>
+      <button id="9">9</button>
+      <button id="E">E</button>
+      <button id="A">A</button>
+      <button id="0">0</button>
+      <button id="B">B</button>
+      <button id="F">F</button>
     </div>
     <div class=select-rom>
       <select id="select-rom">
         <option value="example1">Example Rom 1</option>
       </select>
-      <button>Upload ROM</button>
+      <button id="upload">Upload ROM</button>
+      <button id="run">Run</button>
     </div>
 
     <script type="module">
