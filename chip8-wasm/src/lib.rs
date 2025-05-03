@@ -46,7 +46,7 @@ fn main() -> Result<(), JsValue> {
 fn init_chip8() -> Result<Chip8, JsValue> {
     // workaround that loads a rom into the compiled binary,
     // TODO use fetch instead
-    let rom = include_bytes!("../../roms/6-keypad.ch8");
+    let rom = include_bytes!("../../roms/1-chip8-logo.ch8");
     let mut chip8 = Chip8::new();
     chip8.load_rom(rom);
     Ok(chip8)
