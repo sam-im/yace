@@ -1,9 +1,9 @@
 mod utils;
 
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, rc::Rc, sync::mpsc};
 use chip8::Chip8;
 use wasm_bindgen::prelude::*;
-use web_sys::js_sys::Date;
+use web_sys::{js_sys::Date, Element};
 
 const SCALE: f64 = 1.;
 const TIME_PER_CYCLE: f64 = 0.16;   // amounts to approx. 60hz
@@ -11,7 +11,8 @@ const TIME_PER_CYCLE: f64 = 0.16;   // amounts to approx. 60hz
 #[wasm_bindgen(start)]
 fn main() -> Result<(), JsValue> {
     utils::set_panic_hook();
-    init_html()?;
+    let (tx, rx) = std::sync::mpsc::channel::<Event>();
+    init_html(tx)?;
     let mut chip8 = init_chip8()?;
 
     let f = Rc::new(RefCell::new(None));
@@ -21,6 +22,10 @@ fn main() -> Result<(), JsValue> {
     let mut acc = 0.;
 
     *g.borrow_mut() = Some(Closure::new(move || {
+        while let Ok(msg) = rx.try_recv() {
+            handle_event(&msg, &mut chip8);
+        }
+
         let now = Date::now();
         let dt = now - time;
         acc += dt;
@@ -39,20 +44,50 @@ fn main() -> Result<(), JsValue> {
 }
 
 fn init_chip8() -> Result<Chip8, JsValue> {
-    // workaround that loads the rom into the compiled binary, use fetch instead
-    let rom = include_bytes!("../../roms/4-flags.ch8");
+    // workaround that loads a rom into the compiled binary,
+    // TODO use fetch instead
+    let rom = include_bytes!("../../roms/6-keypad.ch8");
     let mut chip8 = Chip8::new();
     chip8.load_rom(rom);
     Ok(chip8)
 }
 
-fn init_html() -> Result<(), JsValue> {
-    let canvas = utils::document().get_element_by_id("canvas").unwrap();
+
+fn init_html(event_tx: mpsc::Sender<Event>) -> Result<(), JsValue> {
+    let document = utils::document();
+
+    let canvas = document.get_element_by_id("canvas").unwrap();
     let (width, height) = ((640. * SCALE) as usize, (320. * SCALE) as usize);
     canvas.set_attribute("width", &width.to_string())?;
     canvas.set_attribute("height", &height.to_string())?;
 
-    // TODO implement buttons, select-rom, upload rom
+    let button_ids: [&str; 16] = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "A", "B", "C", "D", "E", "F"];
+    let mut buttons: Vec<Element> = button_ids
+        .iter()
+        .map(|c| document.get_element_by_id(c).unwrap())
+        .collect();
+
+    // Register global event handlers onto keys
+    buttons.iter_mut().enumerate().for_each(|(i, b)| {
+        let tx = event_tx.clone();
+        let keydown_cb = Closure::<dyn Fn()>::new(move || {
+            tx.send(Event::Keypad(KeypadEvent::KeyDown(i))).unwrap();
+            utils::log(format!("keypad event: {i} down").as_str());
+        });
+
+        let tx = event_tx.clone();
+        let keyup_cb = Closure::<dyn Fn()>::new(move || {
+            tx.send(Event::Keypad(KeypadEvent::KeyUp(i))).unwrap();
+            utils::log(format!("keypad event: {i} up").as_str());
+        });
+
+        b.add_event_listener_with_callback("mousedown", keydown_cb.as_ref().unchecked_ref()).unwrap();
+        b.add_event_listener_with_callback("mouseup", keyup_cb.as_ref().unchecked_ref()).unwrap();
+
+        // prevent the compiler from dropping these closures
+        keydown_cb.forget();
+        keyup_cb.forget();
+    });
 
     Ok(())
 }
@@ -69,4 +104,36 @@ fn draw(display: &[bool]) {
             ctx.fill_rect(x, y, size, size);
         }
     });
+}
+
+enum Event {
+    Keypad(KeypadEvent),
+}
+
+enum KeypadEvent {
+    KeyDown(usize),
+    KeyUp(usize),
+}
+
+fn handle_event(event: &Event, chip8: &mut Chip8) {
+    match event {
+        Event::Keypad(e) => {
+            match e {
+                KeypadEvent::KeyDown(i) => {
+                    if let Some(key_status) = chip8.keypad.get_mut(*i) {
+                        if ! *key_status {
+                            *key_status = true;
+                        }
+                    }
+                },
+                KeypadEvent::KeyUp(i) => {
+                    if let Some(key_status) = chip8.keypad.get_mut(*i) {
+                        if *key_status {
+                            *key_status = false;
+                        }
+                    }
+                },
+            }
+        }
+    }
 }
